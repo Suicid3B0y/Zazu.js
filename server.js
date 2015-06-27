@@ -107,6 +107,18 @@ io.sockets.on('connection', function (socket) {
     });
     //listChannelsInterval = setInterval(sendListChannels, 1000);
 
+    socket.on('muted', function() {
+        for(peer in sockets) {
+            sockets[peer].emit('muted', {'peer_id':socket.id});
+        }
+    })
+
+    socket.on('unmuted', function() {
+        for(peer in sockets) {
+            sockets[peer].emit('unmuted', {'peer_id':socket.id});
+        }
+    })
+
     socket.on('relayICECandidate', function(config) {
         var peer_id = config.peer_id;
         var ice_candidate = config.ice_candidate;

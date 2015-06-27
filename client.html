@@ -144,6 +144,7 @@
                         remote_media.attr("controls", "");
                         peer_media_elements[peer_id] = remote_media;
                         remote_media.attr("id", peer_id);
+                        $('body').append(peer_id, ' : ');
                         $('body').append(remote_media)
                         $('body').append("<br><br>");
                         attachMediaStream(remote_media[0], event.stream);
@@ -247,6 +248,16 @@
                     delete peers[peer_id];
                     delete peer_media_elements[config.peer_id];
                 });
+                /**
+                 * User interactions
+                 */
+                signaling_socket.on('muted', function(peer) {
+                	$('#'+peer.peer_id).before('<span class="muted">Muted</span>');
+                })
+
+                signaling_socket.on('unmuted', function(peer) {
+                	$('#'+peer.peer_id).prev().remove();
+                })
             }
             /***********************/
             /** Local media stuff **/
@@ -257,21 +268,15 @@
 					if (audioTracks[0].enabled == true) {
 						audioTracks[0].enabled = false;
 						$('#muteButton').attr('value', 'Unmute');
+						signaling_socket.emit('muted')
 					}
 				    else {
 				    	audioTracks[0].enabled = true;
 				    	$('#muteButton').attr('value', 'Mute');
+				    	signaling_socket.emit('unmuted')
 				    }
 				    
 				}
-            }
-            function unMuteMyStream() {
-            	var audioTracks = local_media_stream.getAudioTracks();
-				if (audioTracks[0]) {
-				    
-				    $('#muteButton').attr('value', 'Mute');
-				}
-
             }
             function setup_local_media(callback, errorback) {
                 if (local_media_stream != null) {  /* ie, if we've already been initialized */
