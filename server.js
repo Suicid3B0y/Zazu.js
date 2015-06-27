@@ -28,7 +28,7 @@ main.get('/adapter.js', function(req,res) { res.sendfile('adapter.js'); });
 /*************************/
 /*** INTERESTING STUFF ***/
 /*************************/
-var channels = {};
+var channels = ['Welcome room'];
 var sockets = {};
 
 /**
@@ -67,7 +67,6 @@ io.sockets.on('connection', function (socket) {
             console.log("channel : "+channel);
             part(channel);
         }
-
         if (!(channel in channels)) {
             channels[channel] = {};
         }

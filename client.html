@@ -15,8 +15,7 @@
             /** CONFIG **/
             var SIGNALING_SERVER = "";
             var USE_AUDIO = true;
-            var USE_VIDEO = false;
-            var DEFAULT_CHANNEL = prompt("Quel salon voulez-vous rejoindre ?");
+            var DEFAULT_CHANNEL = "Welcome room";
             var MUTE_AUDIO_BY_DEFAULT = false;
             var CHANNELS = [];
             var ICE_SERVERS = [
@@ -117,11 +116,6 @@
                 signaling_socket.on('addPeer', function(config) {
                     console.log('Signaling server said to add peer:', config);
                     var peer_id = config.peer_id;
-                    if (peer_id in peers) {
-                        /* This could happen if the user joins multiple channels where the other peer is also in. */
-                        console.log("Already connected to peer ", peer_id);
-                        return;
-                    }
                     var peer_connection = new RTCPeerConnection(
                         {"iceServers": ICE_SERVERS},
                         {"optional": [{"DtlsSrtpKeyAgreement": true}]} /* this will no longer be needed by chrome
@@ -142,14 +136,16 @@
                     }
                     peer_connection.onaddstream = function(event) {
                         console.log("onAddStream", event);
-                        var remote_media = USE_VIDEO ? $("<video>") : $("<audio>");
+                        var remote_media = $("<audio>");
                         remote_media.attr("autoplay", "autoplay");
                         if (MUTE_AUDIO_BY_DEFAULT) {
                             remote_media.attr("muted", "true");
                         }
                         remote_media.attr("controls", "");
                         peer_media_elements[peer_id] = remote_media;
-                        $('body').append(remote_media);
+                        remote_media.attr("id", peer_id);
+                        $('body').append(remote_media)
+                        $('body').append("<br><br>");
                         attachMediaStream(remote_media[0], event.stream);
                     }
                     /* Add our local stream */
@@ -255,6 +251,28 @@
             /***********************/
             /** Local media stuff **/
             /***********************/
+            function toggleMyStream() {
+            	var audioTracks = local_media_stream.getAudioTracks();
+				if (audioTracks[0]) {
+					if (audioTracks[0].enabled == true) {
+						audioTracks[0].enabled = false;
+						$('#muteButton').attr('value', 'Unmute');
+					}
+				    else {
+				    	audioTracks[0].enabled = true;
+				    	$('#muteButton').attr('value', 'Mute');
+				    }
+				    
+				}
+            }
+            function unMuteMyStream() {
+            	var audioTracks = local_media_stream.getAudioTracks();
+				if (audioTracks[0]) {
+				    
+				    $('#muteButton').attr('value', 'Mute');
+				}
+
+            }
             function setup_local_media(callback, errorback) {
                 if (local_media_stream != null) {  /* ie, if we've already been initialized */
                     if (callback) callback();
@@ -263,15 +281,18 @@
                 /* Ask user for permission to use the computers microphone and/or camera, 
                  * attach it to an <audio> or <video> tag if they give us access. */
                 console.log("Requesting access to local audio / video inputs");
-                getUserMedia({"audio":USE_AUDIO, "video":USE_VIDEO},
+                getUserMedia({"audio":USE_AUDIO},
                     function(stream) { /* user accepted access to a/v */
                         console.log("Access granted to audio/video");
                         local_media_stream = stream;
-                        var local_media = USE_VIDEO ? $("<video>") : $("<audio>");
+                        var local_media = $("<audio>");
                         local_media.attr("autoplay", "autoplay");
                         local_media.attr("muted", "true"); /* always mute ourselves by default */
                         local_media.attr("controls", "");
+                        local_media.attr('id', "myAudio");
+                        $('body').append("Me :<br><input type='button' id='muteButton' onclick='toggleMyStream()' value='Mute'><br>");
                         $('body').append(local_media);
+                        $('body').append('<br><br>Others :<br>');
                         attachMediaStream(local_media[0], stream);
                         if (callback) callback();
                     },
