@@ -142,11 +142,10 @@
                             remote_media.attr("muted", "true");
                         }
                         remote_media.attr("controls", "");
-                        peer_media_elements[peer_id] = remote_media;
-                        remote_media.attr("id", peer_id);
-                        $('body').append(peer_id, ' : ');
-                        $('body').append(remote_media)
-                        $('body').append("<br><br>");
+                        remote_media.attr("id", 'audio_'+peer_id);
+                        $('body').append('<div id="'+peer_id+'"></div>');
+                        $('#'+peer_id).append(remote_media);
+                    	peer_media_elements[peer_id] = $('#'+peer_id);
                         attachMediaStream(remote_media[0], event.stream);
                     }
                     /* Add our local stream */
@@ -252,11 +251,11 @@
                  * User interactions
                  */
                 signaling_socket.on('muted', function(peer) {
-                	$('#'+peer.peer_id).before('<span class="muted">Muted</span>');
+                	$('#'+peer.peer_id).prepend('<span class="muted">Muted</span>');
                 })
 
                 signaling_socket.on('unmuted', function(peer) {
-                	$('#'+peer.peer_id).prev().remove();
+                	$('#'+peer.peer_id).find('.muted').remove();
                 })
             }
             /***********************/
@@ -295,9 +294,9 @@
                         local_media.attr("muted", "true"); /* always mute ourselves by default */
                         local_media.attr("controls", "");
                         local_media.attr('id', "myAudio");
-                        $('body').append("Me :<br><input type='button' id='muteButton' onclick='toggleMyStream()' value='Mute'><br>");
-                        $('body').append(local_media);
-                        $('body').append('<br><br>Others :<br>');
+                        $('body').append("Me :<br><div id='myInterface'><input type='button' id='muteButton' onclick='toggleMyStream()' value='Mute'><br>");
+                        $('#myInterface').append(local_media);
+                        $('body').append('<br>Others :<br>');
                         attachMediaStream(local_media[0], stream);
                         if (callback) callback();
                     },
