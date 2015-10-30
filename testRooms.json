@@ -1,0 +1,8 @@
+[
+{"id":1, "name":"Root", "children":[2,3,5]},
+{"id":2, "name":"Room 1", "parent":1, "children": []},
+{"id":4, "name":"Room 6", "parent":5, "children": [3]},
+{"id":5, "name":"Room 7", "parent":1, "children": [4,6]},
+{"id":6, "name":"Room 8", "parent":5, "children": []},
+{"id":3, "name":"Room 2", "parent":4, "children": []}
+]

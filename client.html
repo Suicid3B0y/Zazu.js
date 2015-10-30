@@ -29,6 +29,45 @@
             var local_media_stream = null; /* our own microphone / webcam */
             var peers = {};                /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
             var peer_media_elements = {};  /* keep track of our <video>/<audio> tags, indexed by peer_id */
+
+            function join_chat_channel(channel, userdata) {
+                signaling_socket.emit('join', {"channel": channel, "userdata": userdata});
+                console.log("Join channel : "+decodeURI(channel));
+            }
+            function part_chat_channel(channel) {
+                signaling_socket.emit('part', channel);
+            }
+            function isJSON(val){
+                if(typeof(val) == 'string')
+                    return false;
+                try {
+                    var jsons = JSON.stringify(val);
+                    var json = JSON.parse(jsons);
+                }
+                catch(e){
+                    return false;
+                }
+                return true;
+            }
+
+            function create_menu(menu) {
+                res = "";
+                if (isJSON(menu)) {
+                    res += "<li><span onclick='join_chat_channel("+menu.id+")'>"+menu.name+"</span></li>"; 
+                    if (menu.children) {
+                        res += "<ul>";
+                        menu.children.forEach(function(val) { 
+                            if (isJSON(val))
+                                res += create_menu(val);
+                            
+                        });
+                        res += "</ul>";
+                    }
+                    return res;
+                } else 
+                    console.log("Channels list not valid")
+            }
+
             function init() {
                 console.log("Connecting to signaling server");
                 signaling_socket = io.connect(SIGNALING_SERVER);
@@ -37,7 +76,7 @@
                     setup_local_media(function() {
                         /* once the user has given us access to their
                          * microphone/camcorder, join the channel and start peering up */
-                        join_chat_channel(DEFAULT_CHANNEL, {});
+                        //join_chat_channel(DEFAULT_CHANNEL, {});
                     });
                 });
                 signaling_socket.on('disconnect', function() {
@@ -53,45 +92,6 @@
                     peers = {};
                     peer_media_elements = {};
                 });
-                function join_chat_channel(channel, userdata) {
-                    signaling_socket.emit('join', {"channel": channel, "userdata": userdata});
-                }
-                function part_chat_channel(channel) {
-                    signaling_socket.emit('part', channel);
-                }
-                function isJSON(val){
-                	if(typeof(val) == 'string')
-		                return false;
-				    try {
-				        var jsons = JSON.stringify(val);
-				        var json = JSON.parse(jsons);
-				    }
-				    catch(e){
-				        return false;
-				    }
-				    return true;
-				}
-
-                function create_menu(menu) {
-                	res = "";
-                	if (isJSON(menu)) {
-                		name = Object.keys(menu);
-            			value = menu[name];
-            			res += "<li>"+name+"</li>";
-            			if ($.isArray(value)) {
-                			res += "<ul>";
-                			value.forEach(function(val) { 
-                				if (isJSON(val))
-                					res += create_menu(val);
-                				else
-	                				res += "<li><span onclick='joinChannel("+encodeURI(val)+")'>"+val+"</span></li>"; 
-                			});
-                			res += "</ul>";
-	            		}
-                		return res;
-                	} else 
-                		console.log("Channels list not valid")
-                }
 
                 signaling_socket.on('listChannels', function(channels) {
                 	if (! _.isEqual(channels, CHANNELS)) {

@@ -1,0 +1,17 @@
+{
+  "name": "zazu",
+  "version": "0.1.0",
+  "description": "",
+  "main": "server.js",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:Suicid3B0y/Zazu.js.git"
+  },
+  "author": "Thomas Viau <viau.thomas@gmail.com>",
+  "license": "All rights reserved",
+  "dependencies": {
+    "express": "^4.12.4",
+    "sugar": "^1.4.1"
+  }
+}
