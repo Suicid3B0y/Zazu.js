@@ -84,7 +84,7 @@
                 				if (isJSON(val))
                 					res += create_menu(val);
                 				else
-	                				res += "<li>"+val+"</li>"; 
+	                				res += "<li><span onclick='joinChannel("+encodeURI(val)+")'>"+val+"</span></li>"; 
                 			});
                 			res += "</ul>";
 	            		}
