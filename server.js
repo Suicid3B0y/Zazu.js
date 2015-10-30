@@ -18,10 +18,10 @@ server.listen(PORT, null, function() {
     console.log("Listening on port " + PORT);
 });
 
-main.get('/', function(req, res){ res.sendfile('client.html'); });
-main.get('/index.html', function(req, res){ res.sendfile('client.html'); });
-main.get('/client.html', function(req, res){ res.sendfile('client.html'); });
-main.get('/adapter.js', function(req,res) { res.sendfile('adapter.js'); });
+main.get('/', function(req, res){ res.sendFile('client.html'); });
+main.get('/index.html', function(req, res){ res.sendFile('client.html'); });
+main.get('/client.html', function(req, res){ res.sendFile('client.html'); });
+main.get('/adapter.js', function(req,res) { res.sendFile('adapter.js'); });
 
 
 
