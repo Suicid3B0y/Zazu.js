@@ -18,6 +18,7 @@
             var USE_AUDIO = true;
             var MUTE_AUDIO_BY_DEFAULT = false;
             var CHANNELS = [];
+            var NAMES = {};
             var ICE_SERVERS = [
                 {url:"stun:stun.l.google.com:19302"}
             ];
@@ -129,6 +130,12 @@
                             CHANNELS = channels;
                             $('#listChannels').empty();
                             create_menu(CHANNELS);
+                        }
+                    })
+
+                    signaling_socket.on('listNames', function(names) {
+                        if (! _.isEqual(names, NAMES)) {
+                            NAMES = names;
                         }
                     })
                     function getListChannels() {

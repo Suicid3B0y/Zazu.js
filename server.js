@@ -29,6 +29,7 @@ main.get('/adapter.js', function(req,res) { res.sendFile('adapter.js', options);
 
 var channels = listChannels;
 var sockets = {};
+var names = {};
 
 io.sockets.on('connection', function (socket) {
     socket.channel = null;
@@ -36,6 +37,7 @@ io.sockets.on('connection', function (socket) {
     sockets[socket.id] = socket;
     console.log("["+ socket.id + "] connection accepted");
     
+    names[socket.id] = socket.name;
 
     socket.on('disconnect', function () {
         part(socket.channel);
@@ -90,6 +92,7 @@ io.sockets.on('connection', function (socket) {
 
     socket.on('getListChannels', function() {
         socket.emit('listChannels', channels);
+        socket.emit('listNames', names);
     });
     //listChannelsInterval = setInterval(sendListChannels, 1000);
 
