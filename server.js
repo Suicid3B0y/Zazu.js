@@ -43,7 +43,13 @@ io.sockets.on('connection', function (socket) {
         part(socket.channel);
         console.log("["+ socket.id + "] disconnected");
         delete sockets[socket.id];
+        delete names[socket.id];
     });
+
+    socket.on('changeName', function(name) {
+        socket.name = name;
+        names[socket.id] = name;
+    })
 
     function join(channel) {
         console.log("["+ socket.id + "] try to join '"+channel+"'");
@@ -88,12 +94,12 @@ io.sockets.on('connection', function (socket) {
     }
     socket.on('part', part);
 
-    join(DEFAULT_CHANNEL);
-
-    socket.on('getListChannels', function() {
-        socket.emit('listChannels', channels);
+    socket.on('getListChannelsAndNames', function() {
         socket.emit('listNames', names);
+        socket.emit('listChannels', channels);
     });
+
+    join(DEFAULT_CHANNEL);
     //listChannelsInterval = setInterval(sendListChannels, 1000);
 
     socket.on('muted', function() {
