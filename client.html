@@ -3,6 +3,7 @@
     <head>
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
         <script src="http://underscorejs.org/underscore.js"></script>
+        <script src="http://sugarjs.com/release/current/sugar.min.js"></script>
         <script src="adapter.js"></script>
         <style>
             html, body { 
@@ -15,7 +16,6 @@
             /** CONFIG **/
             var SIGNALING_SERVER = "";
             var USE_AUDIO = true;
-            var DEFAULT_CHANNEL = "Welcome room";
             var MUTE_AUDIO_BY_DEFAULT = false;
             var CHANNELS = [];
             var ICE_SERVERS = [
@@ -29,16 +29,80 @@
             var local_media_stream = null; /* our own microphone / webcam */
             var peers = {};                /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
             var peer_media_elements = {};  /* keep track of our <video>/<audio> tags, indexed by peer_id */
+
+            function join_chat_channel(channel) {
+                signaling_socket.emit('join', channel);
+                console.log("Try to join channel : "+decodeURI(channel));
+            }
+            function part_chat_channel(channel) {
+                signaling_socket.emit('part', channel);
+            }
+            function isJSON(val){
+                if(typeof(val) == 'string')
+                    return false;
+                try {
+                    var jsons = JSON.stringify(val);
+                    var json = JSON.parse(jsons);
+                }
+                catch(e){
+                    return false;
+                }
+                return true;
+            }
+
+            function create_menu(menu) {
+                res = $("#listChannels");
+                for (var i = 0; i < menu.length; i++) {
+                    if (isJSON(menu[i])) {
+                        add = "<li><span id='channel_"+menu[i].id+"' onclick='join_chat_channel("+menu[i].id+")'>"+menu[i].name+"</span><ul id='channelmenu_"+menu[i].id+"'>"
+                        for (var j = 0; j < menu[i].sockets.length; j++) 
+                            add += "<li>"+menu[i].sockets[j]+"</li>"
+                        add += "</ul></li>"; 
+                        if (menu[i].father !== null) 
+                            $('#channelmenu_'+menu[i].father).append(add)
+                        else 
+                            $('#listChannels').append(add);
+                    } else 
+                        console.log("Channels list not valid")
+                };
+            }
+
+            function setup_local_media(callback, errorback) {
+                if (local_media_stream != null) {  /* ie, if we've already been initialized */
+                    if (callback) callback();
+                    return; 
+                }
+                /* Ask user for permission to use the computers microphone and/or camera, 
+                 * attach it to an <audio> or <video> tag if they give us access. */
+                console.log("Requesting access to local audio / video inputs");
+                getUserMedia({"audio":USE_AUDIO},
+                    function(stream) { /* user accepted access to a/v */
+                        console.log("Access granted to audio/video");
+                        local_media_stream = stream;
+                        var local_media = $("<audio>");
+                        local_media.attr("autoplay", "autoplay");
+                        local_media.attr("muted", "true"); /* always mute ourselves by default */
+                        local_media.attr("controls", "");
+                        local_media.attr('id', "myAudio");
+                        $('body').append("Me :<br><div id='myInterface'><input type='button' id='muteButton' onclick='toggleMyStream()' value='Mute'><br>");
+                        $('#myInterface').append(local_media);
+                        $('body').append('<br>Others :<br>');
+                        attachMediaStream(local_media[0], stream);
+                        if (callback) callback();
+                    },
+                    function() { /* user denied access to a/v */
+                        console.log("Access denied for audio/video");
+                        alert("You chose not to provide access to the camera/microphone, demo will not work.");
+                        if (errorback) errorback();
+                    });
+            }
+
             function init() {
                 console.log("Connecting to signaling server");
+                setup_local_media(function() {});
                 signaling_socket = io.connect(SIGNALING_SERVER);
                 signaling_socket.on('connect', function() {
                     console.log("Connected to signaling server");
-                    setup_local_media(function() {
-                        /* once the user has given us access to their
-                         * microphone/camcorder, join the channel and start peering up */
-                        join_chat_channel(DEFAULT_CHANNEL, {});
-                    });
                 });
                 signaling_socket.on('disconnect', function() {
                     console.log("Disconnected from signaling server");
@@ -53,59 +117,24 @@
                     peers = {};
                     peer_media_elements = {};
                 });
-                function join_chat_channel(channel, userdata) {
-                    signaling_socket.emit('join', {"channel": channel, "userdata": userdata});
-                }
-                function part_chat_channel(channel) {
-                    signaling_socket.emit('part', channel);
-                }
-                function isJSON(val){
-                	if(typeof(val) == 'string')
-		                return false;
-				    try {
-				        var jsons = JSON.stringify(val);
-				        var json = JSON.parse(jsons);
-				    }
-				    catch(e){
-				        return false;
-				    }
-				    return true;
-				}
 
-                function create_menu(menu) {
-                	res = "";
-                	if (isJSON(menu)) {
-                		name = Object.keys(menu);
-            			value = menu[name];
-            			res += "<li>"+name+"</li>";
-            			if ($.isArray(value)) {
-                			res += "<ul>";
-                			value.forEach(function(val) { 
-                				if (isJSON(val))
-                					res += create_menu(val);
-                				else
-	                				res += "<li>"+val+"</li>"; 
-                			});
-                			res += "</ul>";
-	            		}
-                		return res;
-                	} else 
-                		console.log("Channels list not valid")
-                }
+                signaling_socket.on('joinSuccess', function(channel) {
+                    for (peer_id in peer_media_elements)
+                        peer_media_elements[peer_id].remove();
+                    console.log("Join channel : "+decodeURI(channel));
+                })
 
                 signaling_socket.on('listChannels', function(channels) {
                 	if (! _.isEqual(channels, CHANNELS)) {
                 		CHANNELS = channels;
-                		listChannels = $('#listChannels');
-						newListChannels = create_menu(CHANNELS);
-						listChannels.empty();
-						listChannels.append("<ul>"+newListChannels+"</ul>");
+                        $('#listChannels').empty();
+                		create_menu(CHANNELS);
                 	}
                 })
                 function getListChannels() {
                 	signaling_socket.emit('getListChannels');
                 }
-                getListChannelsInterval = setInterval(getListChannels, 1000)
+                getListChannelsInterval = setInterval(getListChannels, 200)
 
                 /** 
                 * When we join a group, our signaling server will send out 'addPeer' events to each pair
@@ -143,9 +172,10 @@
                         }
                         remote_media.attr("controls", "");
                         remote_media.attr("id", 'audio_'+peer_id);
-                        $('body').append('<div id="'+peer_id+'"></div>');
-                        $('#'+peer_id).append(remote_media);
-                    	peer_media_elements[peer_id] = $('#'+peer_id);
+                        console.log(peer_id.from(2));
+                        $('body').append('<div id="'+peer_id.from(2)+'"></div>');
+                        $('#'+peer_id.from(2)).append(remote_media);
+                    	peer_media_elements[peer_id] = $('#'+peer_id.from(2));
                         attachMediaStream(remote_media[0], event.stream);
                     }
                     /* Add our local stream */
@@ -251,11 +281,11 @@
                  * User interactions
                  */
                 signaling_socket.on('muted', function(peer) {
-                	$('#'+peer.peer_id).prepend('<span class="muted">Muted</span>');
+                	$('#'+peer.peer_id.from(2)).prepend('<span class="muted">Muted</span>');
                 })
 
                 signaling_socket.on('unmuted', function(peer) {
-                	$('#'+peer.peer_id).find('.muted').remove();
+                	$('#'+peer.peer_id.from(2)).find('.muted').remove();
                 })
             }
             /***********************/
@@ -277,39 +307,10 @@
 				    
 				}
             }
-            function setup_local_media(callback, errorback) {
-                if (local_media_stream != null) {  /* ie, if we've already been initialized */
-                    if (callback) callback();
-                    return; 
-                }
-                /* Ask user for permission to use the computers microphone and/or camera, 
-                 * attach it to an <audio> or <video> tag if they give us access. */
-                console.log("Requesting access to local audio / video inputs");
-                getUserMedia({"audio":USE_AUDIO},
-                    function(stream) { /* user accepted access to a/v */
-                        console.log("Access granted to audio/video");
-                        local_media_stream = stream;
-                        var local_media = $("<audio>");
-                        local_media.attr("autoplay", "autoplay");
-                        local_media.attr("muted", "true"); /* always mute ourselves by default */
-                        local_media.attr("controls", "");
-                        local_media.attr('id', "myAudio");
-                        $('body').append("Me :<br><div id='myInterface'><input type='button' id='muteButton' onclick='toggleMyStream()' value='Mute'><br>");
-                        $('#myInterface').append(local_media);
-                        $('body').append('<br>Others :<br>');
-                        attachMediaStream(local_media[0], stream);
-                        if (callback) callback();
-                    },
-                    function() { /* user denied access to a/v */
-                        console.log("Access denied for audio/video");
-                        alert("You chose not to provide access to the camera/microphone, demo will not work.");
-                        if (errorback) errorback();
-                    });
-            }
         </script>
     </head>
     <body onload='init()'>
-    	<div id="listChannels"></div>
+    	<div id="listChannelsDiv"><ul id="listChannels"></ul></div>
         <!-- 
         the <video> and <audio> tags are all added and removed dynamically
         in 'onAddStream', 'setup_local_media', and 'removePeer'/'disconnect'
