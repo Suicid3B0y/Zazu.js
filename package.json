@@ -12,6 +12,7 @@
   "license": "All rights reserved",
   "dependencies": {
     "express": "^4.12.4",
-    "sugar": "^1.4.1"
+    "sugar": "^1.4.1",
+    "socket.io": ""
   }
 }

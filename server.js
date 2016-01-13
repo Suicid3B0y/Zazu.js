@@ -7,7 +7,8 @@ var main = express()
 var server = http.createServer(main)
 var io  = require('socket.io').listen(server);
 var listChannels = require('./serverRooms.json');
-
+console.log(listChannels);
+var DEFAULT_CHANNEL = listChannels[0].id;
 server.listen(PORT, null, function() {
     console.log("Listening on port " + PORT);
 });
@@ -30,61 +31,64 @@ var channels = listChannels;
 var sockets = {};
 
 io.sockets.on('connection', function (socket) {
-    socket.channel = "Welcome room";
+    socket.channel = null;
+    socket.name = "yolo";
     sockets[socket.id] = socket;
-
     console.log("["+ socket.id + "] connection accepted");
+    
+
     socket.on('disconnect', function () {
         part(socket.channel);
         console.log("["+ socket.id + "] disconnected");
         delete sockets[socket.id];
     });
 
-    socket.on('join', function (config) {
-        console.log("["+ socket.id + "] join ", config);
-        var channel = decodeURI(config.channel);
-        var userdata = config.userdata;
+    function join(channel) {
+        console.log("["+ socket.id + "] try to join '"+channel+"'");
         if(channels[channel]) {
             if (channel === socket.channel) {
                 console.log("["+ socket.id + "] ERROR: already joined "+channel);
                 return;
             } else {
-                part(socket.channel);
+                if (socket.channel!==null) part(socket.channel);
                 socket.channel = channel;
                 console.log("["+ socket.id + "] joined '"+channel+"'");
             }
 
-            for (id in channels[channel]) {
-                channels[channel][id].emit('addPeer', {'peer_id': socket.id, 'should_create_offer': false});
-                socket.emit('addPeer', {'peer_id': id, 'should_create_offer': true});
+            for (id in channels[channel].sockets) {
+                console.log(channels[channel].sockets[id]);
+                sockets[channels[channel].sockets[id]].emit('addPeer', {'peer_id': socket.id, 'should_create_offer': false});
+                socket.emit('addPeer', {'peer_id': channels[channel].sockets[id], 'should_create_offer': true});
             }
 
-            channels[channel][socket.id] = socket;
+            channels[channel].sockets.add(socket.id);
         } else {
             console.log("["+ socket.id + "] ERROR: channel '"+ channel+ "' doesn't exist");
         }
-    });
+    }
+
+    socket.on('join', join);
 
     function part(channel) {
         console.log("["+ socket.id + "] part '"+channel+"'");
-        console.log(channels[channel]);
-        if (!(channel===socket.channel.id)) {
+        if (!(channel===socket.channel)) {
 
             console.log("["+ socket.id + "] ERROR: not in ", channel);
             console.log("only in "+socket.channel);
             return;
         }
         delete socket.channel;
-        delete channels[channel][socket.id];
-        for (id in channels[channel]) {
-            channels[channel][id].emit('removePeer', {'peer_id': socket.id});
-            socket.emit('removePeer', {'peer_id': id});
+        channels[channel].sockets.remove(socket.id);
+        for (id in channels[channel].sockets) {
+            sockets[channels[channel].sockets[id]].emit('removePeer', {'peer_id': socket.id});
         }
     }
     socket.on('part', part);
 
+    join(DEFAULT_CHANNEL);
+
     socket.on('getListChannels', function() {
-        socket.emit('listChannels', listChannels);
+        socket.emit('listChannels', channels);
     });
     //listChannelsInterval = setInterval(sendListChannels, 1000);
 
