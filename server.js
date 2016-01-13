@@ -53,6 +53,7 @@ io.sockets.on('connection', function (socket) {
                 if (socket.channel!==null) part(socket.channel);
                 socket.channel = channel;
                 console.log("["+ socket.id + "] joined '"+channel+"'");
+                socket.emit('joinSuccess', channel);
             }
 
             for (id in channels[channel].sockets) {

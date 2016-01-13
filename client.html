@@ -32,9 +32,7 @@
 
             function join_chat_channel(channel) {
                 signaling_socket.emit('join', channel);
-                for (peer_id in peer_media_elements)
-                    peer_media_elements[peer_id].remove();
-                console.log("Join channel : "+decodeURI(channel));
+                console.log("Try to join channel : "+decodeURI(channel));
             }
             function part_chat_channel(channel) {
                 signaling_socket.emit('part', channel);
@@ -119,6 +117,12 @@
                     peers = {};
                     peer_media_elements = {};
                 });
+
+                signaling_socket.on('joinSuccess', function(channel) {
+                    for (peer_id in peer_media_elements)
+                        peer_media_elements[peer_id].remove();
+                    console.log("Join channel : "+decodeURI(channel));
+                })
 
                 signaling_socket.on('listChannels', function(channels) {
                 	if (! _.isEqual(channels, CHANNELS)) {
