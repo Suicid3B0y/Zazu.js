@@ -109,7 +109,13 @@ io.sockets.on('connection', function (socket) {
     socket.on('part', part);
 
     socket.on('msgSent', function(msg) {
-        console.log("["+ socket.id + "] send '"+encodeURI(msg)+"' to '"+socket.channel+"'");
+        console.log("["+ socket.id + "] send '"+encodeURI(msg.content)+"' to '"+socket.channel+"'");
+        switch (msg.code) {
+            case "channel":
+                break;
+            case "private":
+                break;
+        }
         for (id in channels[socket.channel].sockets) {
             sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'channel', 'content':msg, 'author_id': socket.id, 'date': getTimestamp()})
         }
@@ -155,4 +161,3 @@ io.sockets.on('connection', function (socket) {
         }
     });
 });
->>>>>>> feature/audioPanel
