@@ -166,10 +166,20 @@
                             case "connect":
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has connected.</span><br>");
                                 break;
+                            case "moveChannelIn":
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has joined the channel.</span><br>");
+                                break;
+                            case "moveChannelOut":
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has left the channel.</span><br>");
+                                break;
+                            case "moveSelf":
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] You moved to channel '"+msg.content+"' .</span><br>");
+                                break;
                             case "channel":
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] (Channel) <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
                             case "private":
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
                             default:
                                 break;
@@ -375,7 +385,7 @@
         <script>
             $("#chatInput").keyup(function (e) {
                 if (e.keyCode == 13) {
-                    signaling_socket.emit('msgSent', $('#chatInput').val());
+                    signaling_socket.emit('msgSent', {code:'channel', content:$('#chatInput').val());
                     $('#chatInput').val('');
                 }
             });
