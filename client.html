@@ -57,8 +57,12 @@
                 for (var i = 0; i < menu.length; i++) {
                     if (isJSON(menu[i])) {
                         add = "<li><span id='channel_"+menu[i].id+"' onclick='join_chat_channel("+menu[i].id+")'>"+menu[i].name+"</span><ul id='channelmenu_"+menu[i].id+"'>"
-                        for (var j = 0; j < menu[i].sockets.length; j++) 
-                            add += "<li>"+NAMES[menu[i].sockets[j]]+"</li>"
+                        for (var j = 0; j < menu[i].sockets.length; j++) {
+                            add += "<li id='"+menu[i].sockets[j].from(2)+"'>"+NAMES[menu[i].sockets[j]];
+                            if (peer_media_elements[menu[i].sockets[j]])
+                                add += peer_media_elements[menu[i].sockets[j]].get(0).outerHTML;
+                            add += "</li>";
+                        }
                         add += "</ul></li>"; 
                         if (menu[i].father !== null) 
                             $('#channelmenu_'+menu[i].father).append(add)
@@ -184,9 +188,10 @@
                             remote_media.attr("controls", "");
                             remote_media.attr("id", 'audio_'+peer_id);
                             console.log(peer_id.from(2));
-                            $('body').append('<div id="'+peer_id.from(2)+'"></div>');
-                            $('#'+peer_id.from(2)).append(remote_media);
-                            peer_media_elements[peer_id] = $('#'+peer_id.from(2));
+                            //$('body').append('<div id="'+peer_id.from(2)+'"></div>');
+                            //$('#'+peer_id.from(2)).append(remote_media);
+                            //peer_media_elements[peer_id] = $('#'+peer_id.from(2));
+                            peer_media_elements[peer_id] = remote_media;
                             attachMediaStream(remote_media[0], event.stream);
                         }
                         /* Add our local stream */
