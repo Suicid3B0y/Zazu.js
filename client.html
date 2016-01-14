@@ -11,6 +11,8 @@
             }
         </style>
 
+        <link rel="stylesheet" type="text/css" href="bootstrap.css"/>
+
         <script src="/socket.io/socket.io.js"></script>
         <script>
             /** CONFIG **/
@@ -63,12 +65,12 @@
                                 add += peer_media_elements[menu[i].sockets[j]].get(0).outerHTML;
                             add += "</li>";
                         }
-                        add += "</ul></li>"; 
-                        if (menu[i].father !== null) 
+                        add += "</ul></li>";
+                        if (menu[i].father !== null)
                             $('#channelmenu_'+menu[i].father).append(add)
-                        else 
+                        else
                             $('#listChannels').append(add);
-                    } else 
+                    } else
                         console.log("Channels list not valid")
                 };
             }
@@ -76,9 +78,9 @@
             function setup_local_media(callback, errorback) {
                 if (local_media_stream != null) {  /* ie, if we've already been initialized */
                     if (callback) callback();
-                    return; 
+                    return;
                 }
-                /* Ask user for permission to use the computers microphone and/or camera, 
+                /* Ask user for permission to use the computers microphone and/or camera,
                  * attach it to an <audio> or <video> tag if they give us access. */
                 console.log("Requesting access to local audio / video inputs");
                 getUserMedia({"audio":USE_AUDIO},
@@ -151,11 +153,11 @@
                     }
                     getListChannelsAndNamesInterval = setInterval(getListChannelsAndNames, 200)
 
-                    /** 
+                    /**
                     * When we join a group, our signaling server will send out 'addPeer' events to each pair
                     * of users in the group (creating a fully-connected graph of users, ie if there are 6 people
-                    * in the channel you will connect directly to the other 5, so there will be a total of 15 
-                    * connections in the network). 
+                    * in the channel you will connect directly to the other 5, so there will be a total of 15
+                    * connections in the network).
                     */
                     signaling_socket.on('addPeer', function(config) {
                         console.log('Signaling server said to add peer:', config);
@@ -163,14 +165,14 @@
                         var peer_connection = new RTCPeerConnection(
                             {"iceServers": ICE_SERVERS},
                             {"optional": [{"DtlsSrtpKeyAgreement": true}]} /* this will no longer be needed by chrome
-                                                                            * eventually (supposedly), but is necessary 
+                                                                            * eventually (supposedly), but is necessary
                                                                             * for now to get firefox to talk to chrome */
                         );
                         peers[peer_id] = peer_connection;
                         peer_connection.onicecandidate = function(event) {
                             if (event.candidate) {
                                 signaling_socket.emit('relayICECandidate', {
-                                    'peer_id': peer_id, 
+                                    'peer_id': peer_id,
                                     'ice_candidate': {
                                         'sdpMLineIndex': event.candidate.sdpMLineIndex,
                                         'candidate': event.candidate.candidate
@@ -197,20 +199,20 @@
                         /* Add our local stream */
                         peer_connection.addStream(local_media_stream);
                         /* Only one side of the peer connection should create the
-                         * offer, the signaling server picks one to be the offerer. 
+                         * offer, the signaling server picks one to be the offerer.
                          * The other user will get a 'sessionDescription' event and will
                          * create an offer, then send back an answer 'sessionDescription' to us
                          */
                         if (config.should_create_offer) {
                             console.log("Creating RTC offer to ", peer_id);
                             peer_connection.createOffer(
-                                function (local_description) { 
+                                function (local_description) {
                                     console.log("Local offer description is: ", local_description);
                                     peer_connection.setLocalDescription(local_description,
-                                        function() { 
-                                            signaling_socket.emit('relaySessionDescription', 
+                                        function() {
+                                            signaling_socket.emit('relaySessionDescription',
                                                 {'peer_id': peer_id, 'session_description': local_description});
-                                            console.log("Offer setLocalDescription succeeded"); 
+                                            console.log("Offer setLocalDescription succeeded");
                                         },
                                         function() { Alert("Offer setLocalDescription failed!"); }
                                     );
@@ -220,11 +222,11 @@
                                 });
                         }
                     });
-                    /** 
+                    /**
                      * Peers exchange session descriptions which contains information
                      * about their audio / video settings and that sort of stuff. First
                      * the 'offerer' sends a description to the 'answerer' (with type
-                     * "offer"), then the answerer sends one back (with type "answer").  
+                     * "offer"), then the answerer sends one back (with type "answer").
                      */
                     signaling_socket.on('sessionDescription', function(config) {
                         console.log('Remote description received: ', config);
@@ -233,7 +235,7 @@
                         var remote_description = config.session_description;
                         console.log(config.session_description);
                         var desc = new RTCSessionDescription(remote_description);
-                        var stuff = peer.setRemoteDescription(desc, 
+                        var stuff = peer.setRemoteDescription(desc,
                             function() {
                                 console.log("setRemoteDescription succeeded");
                                 if (remote_description.type == "offer") {
@@ -242,8 +244,8 @@
                                         function(local_description) {
                                             console.log("Answer description is: ", local_description);
                                             peer.setLocalDescription(local_description,
-                                                function() { 
-                                                    signaling_socket.emit('relaySessionDescription', 
+                                                function() {
+                                                    signaling_socket.emit('relaySessionDescription',
                                                         {'peer_id': peer_id, 'session_description': local_description});
                                                     console.log("Answer setLocalDescription succeeded");
                                                 },
@@ -263,7 +265,7 @@
                         console.log("Description Object: ", desc);
                     });
                     /**
-                     * The offerer will send a number of ICE Candidate blobs to the answerer so they 
+                     * The offerer will send a number of ICE Candidate blobs to the answerer so they
                      * can begin trying to find the best path to one another on the net.
                      */
                     signaling_socket.on('iceCandidate', function(config) {
@@ -321,7 +323,7 @@
                         $('#muteButton').attr('value', 'Mute');
                         signaling_socket.emit('unmuted')
                     }
-                    
+
                 }
             }
 
@@ -345,7 +347,7 @@
     </head>
     <body onload='start_name()'>
         <div id="listChannelsDiv"><ul id="listChannels"></ul></div>
-        <!-- 
+        <!--
         the <video> and <audio> tags are all added and removed dynamically
         in 'onAddStream', 'setup_local_media', and 'removePeer'/'disconnect'
         -->
