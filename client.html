@@ -173,7 +173,7 @@
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has left the channel.</span><br>");
                                 break;
                             case "moveSelf":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] You moved to channel '"+msg.content+"' .</span><br>");
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] You moved to channel <b>"+msg.content+"</b>.</span><br>");
                                 break;
                             case "channel":
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] (Channel) <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
@@ -182,8 +182,6 @@
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
                             case "privateOut":
-                                console.log(msg.receiver_id);
-                                console.log(NAMES[msg.receiver_id]);
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] To <b>"+NAMES[msg.receiver_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
                             default:

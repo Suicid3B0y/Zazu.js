@@ -83,6 +83,7 @@ io.sockets.on('connection', function (socket) {
                 sockets[channels[channel].sockets[id]].emit('addPeer', {'peer_id': socket.id, 'should_create_offer': false});
                 socket.emit('addPeer', {'peer_id': channels[channel].sockets[id], 'should_create_offer': true});
                 sockets[channels[channel].sockets[id]].emit('msgReceived', {code:"moveChannelIn", author_id:socket.id, date: getTimestamp()});
+                socket.emit('msgReceived', {code:"moveSelf", content:channels[channel].name, date: getTimestamp()});
             }
 
             channels[channel].sockets.add(socket.id);
