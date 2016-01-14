@@ -183,7 +183,7 @@
                                 break;
                             case "privateOut":
                                 console.log(msg.receiver_id);
-                                console.log(NAMES[receiver_id]);
+                                console.log(NAMES[msg.receiver_id]);
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] To <b>"+NAMES[msg.receiver_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
                             default:
