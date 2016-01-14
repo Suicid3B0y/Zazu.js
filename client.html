@@ -385,7 +385,7 @@
         <script>
             $("#chatInput").keyup(function (e) {
                 if (e.keyCode == 13) {
-                    signaling_socket.emit('msgSent', {code:'channel', content:$('#chatInput').val());
+                    signaling_socket.emit('msgSent', {code:'channel', content:$('#chatInput').val()});
                     $('#chatInput').val('');
                 }
             });
