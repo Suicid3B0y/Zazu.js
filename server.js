@@ -114,12 +114,12 @@ io.sockets.on('connection', function (socket) {
         switch (msg.code) {
             case "channel":
                 for (id in channels[socket.channel].sockets) {
-                    sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'channel', 'content':msg, 'author_id': socket.id, 'date': getTimestamp()})
+                    sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'channel', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()})
                 }
                 break;
             case "private":
                 for (id in channels[socket.channel].sockets) {
-                    sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'private', 'content':msg, 'author_id': socket.id, 'date': getTimestamp()})
+                    sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'private', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()})
                 }
                 break;
         }
