@@ -82,6 +82,7 @@ io.sockets.on('connection', function (socket) {
                 console.log(channels[channel].sockets[id]);
                 sockets[channels[channel].sockets[id]].emit('addPeer', {'peer_id': socket.id, 'should_create_offer': false});
                 socket.emit('addPeer', {'peer_id': channels[channel].sockets[id], 'should_create_offer': true});
+                sockets[channels[channel].sockets[id]].emit('msgReceived', {code:"moveChannelIn", author_id:socket.id, date: getTimestamp()});
             }
 
             channels[channel].sockets.add(socket.id);
@@ -104,7 +105,7 @@ io.sockets.on('connection', function (socket) {
         channels[channel].sockets.remove(socket.id);
         for (id in channels[channel].sockets) {
             sockets[channels[channel].sockets[id]].emit('removePeer', {'peer_id': socket.id});
-            sockets[channels[channel].sockets[id]].emit('msgReceived', {code:"moveChannelOut", author_id:socket.id, date: getTimestamp()});  
+            sockets[channels[channel].sockets[id]].emit('msgReceived', {code:"moveChannelOut", author_id:socket.id, date: getTimestamp()});
         }
     }
     socket.on('part', part);
@@ -118,8 +119,9 @@ io.sockets.on('connection', function (socket) {
                 }
                 break;
             case "private":
-                for (id in channels[socket.channel].sockets) {
-                    sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'private', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()})
+                if (sockets[msg.receiver]) {
+                    sockets[msg.receiver].emit('msgReceived', {'code':'privateIn', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()});
+                    socket.id.emit('msgReceived', {'code':'privateOut', 'content':msg.content, 'received_id': socket.id, 'date': getTimestamp()});
                 }
                 break;
         }

@@ -178,8 +178,11 @@
                             case "channel":
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] (Channel) <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
-                            case "private":
+                            case "privateIn":
                                 $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
+                                break;
+                            case "privateOut":
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] To <b>"+NAMES[msg.receiver_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
                             default:
                                 break;
