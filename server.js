@@ -34,15 +34,27 @@ var names = {};
 
 io.sockets.on('connection', function (socket) {
     socket.channel = null;
-    socket.name = "yolo";
+    socket.name = (socket.handshake.query.name!==null)? socket.handshake.query.name : "Noob user";
     sockets[socket.id] = socket;
     console.log("["+ socket.id + "] connection accepted");
     
     names[socket.id] = socket.name;
 
+    for (id in sockets) {
+        sockets[id].emit('listNames', names);
+        sockets[id].emit("msgReceived", {code:"connect", author_id:socket.id, date: getTimestamp()})
+    }
+
+
+    function getTimestamp() {
+        return parseInt(Date.now()/1000,10);
+    }
+
     socket.on('disconnect', function () {
         part(socket.channel);
         console.log("["+ socket.id + "] disconnected");
+        for (id in sockets)
+            sockets[id].emit("msgReceived", {code:"disconnect", author_id:socket.id, date: getTimestamp()})
         delete sockets[socket.id];
         delete names[socket.id];
     });
@@ -51,6 +63,7 @@ io.sockets.on('connection', function (socket) {
         socket.name = name;
         names[socket.id] = name;
     })
+
 
     function join(channel) {
         console.log("["+ socket.id + "] try to join '"+channel+"'");
@@ -95,6 +108,13 @@ io.sockets.on('connection', function (socket) {
     }
     socket.on('part', part);
 
+    socket.on('msgSent', function(msg) {
+        console.log("["+ socket.id + "] send '"+encodeURI(msg)+"' to '"+socket.channel+"'");
+        for (id in channels[socket.channel].sockets) {
+            sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'channel', 'content':msg, 'author_id': socket.id, 'date': getTimestamp()})
+        }
+    });
+
     socket.on('getListChannelsAndNames', function() {
         socket.emit('listNames', names);
         socket.emit('listChannels', channels);
@@ -135,3 +155,4 @@ io.sockets.on('connection', function (socket) {
         }
     });
 });
+>>>>>>> feature/audioPanel
