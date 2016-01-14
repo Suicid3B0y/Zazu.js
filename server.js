@@ -121,7 +121,7 @@ io.sockets.on('connection', function (socket) {
             case "private":
                 if (sockets[msg.receiver_id]) {
                     sockets[msg.receiver_id].emit('msgReceived', {'code':'privateIn', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()});
-                    socket.emit('msgReceived', {'code':'privateOut', 'content':msg.content, 'receiver_id': socket.id, 'date': getTimestamp()});
+                    socket.emit('msgReceived', {'code':'privateOut', 'content':msg.content, 'receiver_id': msg.receiver_id, 'date': getTimestamp()});
                 }
                 break;
         }
