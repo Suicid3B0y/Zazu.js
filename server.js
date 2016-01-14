@@ -104,6 +104,7 @@ io.sockets.on('connection', function (socket) {
         channels[channel].sockets.remove(socket.id);
         for (id in channels[channel].sockets) {
             sockets[channels[channel].sockets[id]].emit('removePeer', {'peer_id': socket.id});
+            sockets[channels[channel].sockets[id]].emit('msgReceived', {code:"moveChannelOut", author_id:socket.id, date: getTimestamp()});  
         }
     }
     socket.on('part', part);
@@ -112,12 +113,15 @@ io.sockets.on('connection', function (socket) {
         console.log("["+ socket.id + "] send '"+encodeURI(msg.content)+"' to '"+socket.channel+"'");
         switch (msg.code) {
             case "channel":
+                for (id in channels[socket.channel].sockets) {
+                    sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'channel', 'content':msg, 'author_id': socket.id, 'date': getTimestamp()})
+                }
                 break;
             case "private":
+                for (id in channels[socket.channel].sockets) {
+                    sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'private', 'content':msg, 'author_id': socket.id, 'date': getTimestamp()})
+                }
                 break;
-        }
-        for (id in channels[socket.channel].sockets) {
-            sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'channel', 'content':msg, 'author_id': socket.id, 'date': getTimestamp()})
         }
     });
 
