@@ -57,8 +57,9 @@
                 for (var i = 0; i < menu.length; i++) {
                     if (isJSON(menu[i])) {
                         add = "<li><span id='channel_"+menu[i].id+"' onclick='join_chat_channel("+menu[i].id+")'>"+menu[i].name+"</span><ul id='channelmenu_"+menu[i].id+"'>"
-                        for (var j = 0; j < menu[i].sockets.length; j++) 
-                            add += "<li>"+NAMES[menu[i].sockets[j]]+"</li>"
+                        for (var j = 0; j < menu[i].sockets.length; j++) {
+                            add += "<li data-id-user='"+menu[i].sockets[j]+"'>"+NAMES[menu[i].sockets[j]]+"</li>";
+                        }
                         add += "</ul></li>"; 
                         if (menu[i].father !== null) 
                             $('#channelmenu_'+menu[i].father).append(add)
@@ -102,9 +103,8 @@
             function init() {
                 console.log("Connecting to signaling server");
                 setup_local_media(function() {
-                    signaling_socket = io.connect(SIGNALING_SERVER);
+                    signaling_socket = io.connect(SIGNALING_SERVER, {query:"name="+NAME});
                     signaling_socket.on('connect', function() {
-                        signaling_socket.emit('changeName', NAME);
                         console.log("Connected to signaling server");
                     });
                     signaling_socket.on('disconnect', function() {
@@ -147,6 +147,33 @@
                     }
                     getListChannelsAndNamesInterval = setInterval(getListChannelsAndNames, 200)
 
+                    function timestampToTime(timestamp) {
+                        var date = new Date(timestamp*1000);
+                        var hours = date.getHours();
+                        var minutes = "0" + date.getMinutes();
+                        var seconds = "0" + date.getSeconds();
+                        return hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
+                    }
+
+                    signaling_socket.on('msgReceived', function(msg) {
+                        console.log(msg);
+                        switch (msg.code) {
+                            case "disconnect": 
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has disconnected.</span><br>");
+                                break;
+                            case "connect":
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has connected.</span><br>");
+                                break;
+                            case "channel":
+                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] (Channel) <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
+                                break;
+                            case "private":
+                                break;
+                            default:
+                                break;
+                        }
+                    });
+
                     /** 
                     * When we join a group, our signaling server will send out 'addPeer' events to each pair
                     * of users in the group (creating a fully-connected graph of users, ie if there are 6 people
@@ -186,6 +213,7 @@
                             console.log(peer_id.from(2));
                             $('body').append('<div id="'+peer_id.from(2)+'"></div>');
                             $('#'+peer_id.from(2)).append(remote_media);
+
                             peer_media_elements[peer_id] = $('#'+peer_id.from(2));
                             attachMediaStream(remote_media[0], event.stream);
                         }
@@ -340,9 +368,15 @@
     </head>
     <body onload='start_name()'>
         <div id="listChannelsDiv"><ul id="listChannels"></ul></div>
-        <!-- 
-        the <video> and <audio> tags are all added and removed dynamically
-        in 'onAddStream', 'setup_local_media', and 'removePeer'/'disconnect'
-        -->
+        <div id="chat"><div id="chatContent"></div><input type="text" placeholder="Entrez un message" id="chatInput"/></div>
+
+        <script>
+            $("#chatInput").keyup(function (e) {
+                if (e.keyCode == 13) {
+                    signaling_socket.emit('msgSent', $('#chatInput').val());
+                    $('#chatInput').val('');
+                }
+            });
+        </script>
     </body>
 </html>
