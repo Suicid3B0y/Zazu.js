@@ -112,6 +112,7 @@ io.sockets.on('connection', function (socket) {
 
     socket.on('msgSent', function(msg) {
         console.log("["+ socket.id + "] send '"+encodeURI(msg.content)+"' to '"+socket.channel+"'");
+        console.log(msg);
         switch (msg.code) {
             case "channel":
                 for (id in channels[socket.channel].sockets) {
@@ -119,8 +120,8 @@ io.sockets.on('connection', function (socket) {
                 }
                 break;
             case "private":
-                if (sockets[msg.receiver]) {
-                    sockets[msg.receiver].emit('msgReceived', {'code':'privateIn', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()});
+                if (sockets[msg.receiver_id]) {
+                    sockets[msg.receiver_id].emit('msgReceived', {'code':'privateIn', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()});
                     socket.id.emit('msgReceived', {'code':'privateOut', 'content':msg.content, 'received_id': socket.id, 'date': getTimestamp()});
                 }
                 break;
