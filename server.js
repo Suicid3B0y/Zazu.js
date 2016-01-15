@@ -35,6 +35,7 @@ var names = {};
 io.sockets.on('connection', function (socket) {
     socket.channel = null;
     socket.name = (socket.handshake.query.name!==null)? socket.handshake.query.name : "Noob user";
+    socket.microphone_ok = socket.handshake.query.microphone_ok;
     sockets[socket.id] = socket;
     console.log("["+ socket.id + "] connection accepted");
     
