@@ -24,10 +24,11 @@ var options = {
 
 main.get('/', function(req, res){ res.sendFile('client.html', options); });
 main.get('/:source', function(req, res) { res.sendFile(req.params.source, options); });
+main.get('/css/:source', function(req, res) { res.sendFile("css/"+req.params.source, options); });
+main.get('/fonts/:source', function(req, res) { res.sendFile("fonts/"+req.params.source, options); });
+main.get('/js/:source', function(req, res) { res.sendFile("js/"+req.params.source, options); });
 main.get('/index.html', function(req, res){ res.sendFile('client.html', options); });
 main.get('/client.html', function(req, res){ res.sendFile('client.html', options); });
-main.get('/adapter.js', function(req,res) { res.sendFile('adapter.js', options); });
-main.get('/bootstrap.css', function(req,res) { res.sendFile('bootstrap.css', options); });
 
 var channels = listChannels;
 var sockets = {};
@@ -35,7 +36,7 @@ var names = {};
 
 io.sockets.on('connection', function (socket) {
     socket.channel = null;
-    socket.name = (socket.handshake.query.name!==null)? socket.handshake.query.name : "Noob user";
+    socket.name = (socket.handshake.query.name!==null && socket.handshake.query.name!=="")? socket.handshake.query.name : "Noob user";
     socket.microphone_ok = socket.handshake.query.microphone_ok;
     sockets[socket.id] = socket;
     console.log("["+ socket.id + "] connection accepted");
