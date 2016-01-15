@@ -1,12 +1,12 @@
 #chatContent {
-    max-height:150px;
-    overflow: scroll;
+    max-height:20vh;
+    overflow: auto;
     height: 150px;
 }
 
 #listChannelsDiv {
-    max-height: 300px;
-    overflow: scroll;
+    max-height: 40vh;
+    overflow: auto;
 }
 
 .ui-button {
