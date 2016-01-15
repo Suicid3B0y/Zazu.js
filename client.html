@@ -91,11 +91,11 @@
                         controlPanelElement.append("<div><b>Options :<b><br></div>"
                             + "<div id='myInterface'>"
                             + "<div id='self-mute-microphone-container' style='display: inline' rel='microphone-container' onclick='toggleMyStream()'>"
-                            + "<a id='self-mute-microphone-button' class='btn' href='#' rel='popover' data-content='Mute your microphone' data-placement='bottom' data-trigger='hover'>"
+                            + "<a id='self-mute-microphone-button' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Mute your microphone' data-placement='bottom' data-trigger='hover'>"
                             + "<i id='self-mute-microphone-icon' class='fa fa-microphone'></i>"
                             + "</a>"
                             + "</div>"
-                            + "<input type='button' id='changeNameButton' class='btn' onclick='change_name()' value='Change username'>"
+                            + "<input type='button' id='changeNameButton' class='btn btn-sm' onclick='change_name()' value='Change username'>"
                             + "<br>");
                         $('a[rel="popover"]').popover();
                         $('#myInterface').append(local_media);
@@ -398,7 +398,7 @@
                 <div id="chat"><div id="chatContent">
                 </div>
                     <div id='autoscroll-chat-container' style='display: inline' onclick='toggleAutoscroll()'>
-                        <a id='autoscroll-chat' class='btn btn-sm' href='#' rel='popover' data-content='Enable Auto-scroll in chat' data-placement='bottom' data-trigger='hover'>
+                        <a id='autoscroll-chat' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Enable Auto-scroll in chat' data-placement='bottom' data-trigger='hover'>
                             <i id='autoscroll-chat-icon' class='fa fa-pause'></i>
                         </a>
                     </div>
