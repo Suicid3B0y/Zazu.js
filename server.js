@@ -26,10 +26,9 @@ main.get('/', function(req, res){ res.sendFile('client.html', options); });
 main.get('/:source', function(req, res) { res.sendFile(req.params.source, options); });
 main.get('/css/:source', function(req, res) { res.sendFile("css/"+req.params.source, options); });
 main.get('/fonts/:source', function(req, res) { res.sendFile("fonts/"+req.params.source, options); });
+main.get('/js/:source', function(req, res) { res.sendFile("js/"+req.params.source, options); });
 main.get('/index.html', function(req, res){ res.sendFile('client.html', options); });
 main.get('/client.html', function(req, res){ res.sendFile('client.html', options); });
-main.get('/adapter.js', function(req,res) { res.sendFile('adapter.js', options); });
-main.get('/bootstrap.css', function(req,res) { res.sendFile('bootstrap.css', options); });
 
 var channels = listChannels;
 var sockets = {};
