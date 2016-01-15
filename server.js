@@ -29,6 +29,10 @@ main.get('/fonts/:source', function(req, res) { res.sendFile("fonts/"+req.params
 main.get('/js/:source', function(req, res) { res.sendFile("js/"+req.params.source, options); });
 main.get('/index.html', function(req, res){ res.sendFile('client.html', options); });
 main.get('/client.html', function(req, res){ res.sendFile('client.html', options); });
+main.get('/adapter.js', function(req,res) { res.sendFile('adapter.js', options); });
+main.get('/bootstrap.css', function(req,res) { res.sendFile('bootstrap.css', options); });
+main.get('/client.css', function(req,res) { res.sendFile('client.css', options); });
+main.get('/awesome-bootstrap-checkbox.css', function(req,res) { res.sendFile('awesome-bootstrap-checkbox.css', options); });
 
 var channels = listChannels;
 var sockets = {};
