@@ -23,6 +23,7 @@ var options = {
   };
 
 main.get('/', function(req, res){ res.sendFile('client.html', options); });
+main.get('/:source', function(req, res) { res.sendFile(req.params.source, options); });
 main.get('/index.html', function(req, res){ res.sendFile('client.html', options); });
 main.get('/client.html', function(req, res){ res.sendFile('client.html', options); });
 main.get('/adapter.js', function(req,res) { res.sendFile('adapter.js', options); });
@@ -77,6 +78,7 @@ io.sockets.on('connection', function (socket) {
                 socket.channel = channel;
                 console.log("["+ socket.id + "] joined '"+channel+"'");
                 socket.emit('joinSuccess', channel);
+                socket.emit('msgReceived', {code:"moveSelf", content:channels[channel].name, date: getTimestamp()});
             }
 
             for (id in channels[channel].sockets) {
@@ -84,7 +86,6 @@ io.sockets.on('connection', function (socket) {
                 sockets[channels[channel].sockets[id]].emit('addPeer', {'peer_id': socket.id, 'should_create_offer': false});
                 socket.emit('addPeer', {'peer_id': channels[channel].sockets[id], 'should_create_offer': true});
                 sockets[channels[channel].sockets[id]].emit('msgReceived', {code:"moveChannelIn", author_id:socket.id, date: getTimestamp()});
-                socket.emit('msgReceived', {code:"moveSelf", content:channels[channel].name, date: getTimestamp()});
             }
 
             channels[channel].sockets.add(socket.id);
@@ -113,20 +114,28 @@ io.sockets.on('connection', function (socket) {
     socket.on('part', part);
 
     socket.on('msgSent', function(msg) {
-        console.log("["+ socket.id + "] send '"+encodeURI(msg.content)+"' to '"+socket.channel+"'");
         switch (msg.code) {
             case "channel":
+                console.log("["+ socket.id + "] send '"+encodeURI(msg.content)+"' to '"+socket.channel+"'");
                 for (id in channels[socket.channel].sockets) {
                     sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {'code':'channel', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()})
                 }
                 break;
             case "private":
+                console.log("["+ socket.id + "] send '"+encodeURI(msg.content)+"' to ["+msg.receiver_id+"]");
                 if (sockets[msg.receiver_id]) {
                     sockets[msg.receiver_id].emit('msgReceived', {'code':'privateIn', 'content':msg.content, 'author_id': socket.id, 'date': getTimestamp()});
                     socket.emit('msgReceived', {'code':'privateOut', 'content':msg.content, 'receiver_id': msg.receiver_id, 'date': getTimestamp()});
+                } else {
+                    console.log("["+ socket.id + "] can't find the receiver ["+msg.receiver_id+"]");
                 }
                 break;
         }
+    });
+
+    socket.on('editNameChannel', function(channel) {
+        console.log("["+ socket.id + "] change name of channel of id '"+channel.id+"' from '"+channels[channel.id].name+"'' to '"+channel.name+"'");
+        channels[channel.id].name = channel.name;
     });
 
     socket.on('getListChannelsAndNames', function() {
