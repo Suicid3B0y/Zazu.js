@@ -5,9 +5,13 @@
         <script src="http://underscorejs.org/underscore.js"></script>
         <script src="http://sugarjs.com/release/current/sugar.min.js"></script>
         <script src="adapter.js"></script>
-        
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
         <link rel="stylesheet" type="text/css" href="bootstrap.css"/>
-        
+        <link rel="stylesheet" type="text/css" href="client.css"/>
+        <link rel="stylesheet" type="text/css" href="awesome-bootstrap-checkbox.css"/>
+
         <script src="/socket.io/socket.io.js"></script>
         <script>
             /** CONFIG **/
@@ -57,12 +61,12 @@
                         for (var j = 0; j < menu[i].sockets.length; j++) {
                             add += "<li data-id-user='"+menu[i].sockets[j]+"'>"+NAMES[menu[i].sockets[j]]+"</li>";
                         }
-                        add += "</ul></li>"; 
-                        if (menu[i].father !== null) 
+                        add += "</ul></li>";
+                        if (menu[i].father !== null)
                             $('#channelmenu_'+menu[i].father).append(add)
-                        else 
+                        else
                             $('#listChannels').append(add);
-                    } else 
+                    } else
                         console.log("Channels list not valid")
                 };
             }
@@ -70,9 +74,9 @@
             function setup_local_media(callback, errorback) {
                 if (local_media_stream != null) {  /* ie, if we've already been initialized */
                     if (callback) callback();
-                    return; 
+                    return;
                 }
-                /* Ask user for permission to use the computers microphone and/or camera, 
+                /* Ask user for permission to use the computers microphone and/or camera,
                  * attach it to an <audio> or <video> tag if they give us access. */
                 console.log("Requesting access to local audio / video inputs");
                 getUserMedia({"audio":USE_AUDIO},
@@ -81,12 +85,21 @@
                         local_media_stream = stream;
                         var local_media = $("<audio>");
                         local_media.attr("autoplay", "autoplay");
-                        local_media.attr("muted", "true"); /* always mute ourselves by default */
                         local_media.attr("controls", "");
                         local_media.attr('id', "myAudio");
-                        $('body').append("Me :<br><div id='myInterface'><input type='button' id='muteButton' onclick='toggleMyStream()' value='Mute'><input type='button' id='changeNameButton' onclick='change_name()' value='Changer de nom'><br>");
+                        var controlPanelElement = $('#control-panel');
+                        controlPanelElement.append("<div><b>Options :<b><br></div>"
+                            + "<div id='myInterface'>"
+                            + "<div id='self-mute-microphone-container' style='display: inline' rel='microphone-container' onclick='toggleMyStream()'>"
+                            + "<a id='self-mute-microphone-button' class='btn' href='#' rel='popover' data-content='Mute your microphone' data-placement='bottom' data-trigger='hover'>"
+                            + "<i id='self-mute-microphone-icon' class='fa fa-microphone'></i>"
+                            + "</a>"
+                            + "</div>"
+                            + "<input type='button' id='changeNameButton' class='btn' onclick='change_name()' value='Change username'>"
+                            + "<br>");
+                        $('a[rel="popover"]').popover();
                         $('#myInterface').append(local_media);
-                        $('body').append('<br>Others :<br>');
+                        controlPanelElement.append('<div><b>Channel user volumes :<b><br></div>');
                         attachMediaStream(local_media[0], stream);
                         if (callback) callback();
                     },
@@ -154,28 +167,33 @@
 
                     signaling_socket.on('msgReceived', function(msg) {
                         console.log(msg);
+                        var chatContentElement = $('#chatContent');
                         switch (msg.code) {
-                            case "disconnect": 
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has disconnected.</span><br>");
+                            case "disconnect":
+                                chatContentElement.append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has disconnected.</span><br>");
                                 break;
                             case "connect":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has connected.</span><br>");
+                                chatContentElement.append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has connected.</span><br>");
                                 break;
                             case "channel":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] (Channel) <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
+                                chatContentElement.append("<span>["+timestampToTime(msg.date)+"] (Channel) <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
                                 break;
                             case "private":
                                 break;
                             default:
                                 break;
                         }
+                        console.log(autoscroll);
+                        if (autoscroll) {
+                            scrollChat();
+                        }
                     });
 
-                    /** 
+                    /**
                     * When we join a group, our signaling server will send out 'addPeer' events to each pair
                     * of users in the group (creating a fully-connected graph of users, ie if there are 6 people
-                    * in the channel you will connect directly to the other 5, so there will be a total of 15 
-                    * connections in the network). 
+                    * in the channel you will connect directly to the other 5, so there will be a total of 15
+                    * connections in the network).
                     */
                     signaling_socket.on('addPeer', function(config) {
                         console.log('Signaling server said to add peer:', config);
@@ -183,14 +201,14 @@
                         var peer_connection = new RTCPeerConnection(
                             {"iceServers": ICE_SERVERS},
                             {"optional": [{"DtlsSrtpKeyAgreement": true}]} /* this will no longer be needed by chrome
-                                                                            * eventually (supposedly), but is necessary 
+                                                                            * eventually (supposedly), but is necessary
                                                                             * for now to get firefox to talk to chrome */
                         );
                         peers[peer_id] = peer_connection;
                         peer_connection.onicecandidate = function(event) {
                             if (event.candidate) {
                                 signaling_socket.emit('relayICECandidate', {
-                                    'peer_id': peer_id, 
+                                    'peer_id': peer_id,
                                     'ice_candidate': {
                                         'sdpMLineIndex': event.candidate.sdpMLineIndex,
                                         'candidate': event.candidate.candidate
@@ -208,7 +226,7 @@
                             remote_media.attr("controls", "");
                             remote_media.attr("id", 'audio_'+peer_id);
                             console.log(peer_id.from(2));
-                            $('body').append('<div id="'+peer_id.from(2)+'"></div>');
+                            $('#control-panel').append('<div id="'+peer_id.from(2)+'"></div>');
                             $('#'+peer_id.from(2)).append(remote_media);
 
                             peer_media_elements[peer_id] = $('#'+peer_id.from(2));
@@ -217,20 +235,20 @@
                         /* Add our local stream */
                         peer_connection.addStream(local_media_stream);
                         /* Only one side of the peer connection should create the
-                         * offer, the signaling server picks one to be the offerer. 
+                         * offer, the signaling server picks one to be the offerer.
                          * The other user will get a 'sessionDescription' event and will
                          * create an offer, then send back an answer 'sessionDescription' to us
                          */
                         if (config.should_create_offer) {
                             console.log("Creating RTC offer to ", peer_id);
                             peer_connection.createOffer(
-                                function (local_description) { 
+                                function (local_description) {
                                     console.log("Local offer description is: ", local_description);
                                     peer_connection.setLocalDescription(local_description,
-                                        function() { 
-                                            signaling_socket.emit('relaySessionDescription', 
+                                        function() {
+                                            signaling_socket.emit('relaySessionDescription',
                                                 {'peer_id': peer_id, 'session_description': local_description});
-                                            console.log("Offer setLocalDescription succeeded"); 
+                                            console.log("Offer setLocalDescription succeeded");
                                         },
                                         function() { Alert("Offer setLocalDescription failed!"); }
                                     );
@@ -240,11 +258,11 @@
                                 });
                         }
                     });
-                    /** 
+                    /**
                      * Peers exchange session descriptions which contains information
                      * about their audio / video settings and that sort of stuff. First
                      * the 'offerer' sends a description to the 'answerer' (with type
-                     * "offer"), then the answerer sends one back (with type "answer").  
+                     * "offer"), then the answerer sends one back (with type "answer").
                      */
                     signaling_socket.on('sessionDescription', function(config) {
                         console.log('Remote description received: ', config);
@@ -253,7 +271,7 @@
                         var remote_description = config.session_description;
                         console.log(config.session_description);
                         var desc = new RTCSessionDescription(remote_description);
-                        var stuff = peer.setRemoteDescription(desc, 
+                        var stuff = peer.setRemoteDescription(desc,
                             function() {
                                 console.log("setRemoteDescription succeeded");
                                 if (remote_description.type == "offer") {
@@ -262,8 +280,8 @@
                                         function(local_description) {
                                             console.log("Answer description is: ", local_description);
                                             peer.setLocalDescription(local_description,
-                                                function() { 
-                                                    signaling_socket.emit('relaySessionDescription', 
+                                                function() {
+                                                    signaling_socket.emit('relaySessionDescription',
                                                         {'peer_id': peer_id, 'session_description': local_description});
                                                     console.log("Answer setLocalDescription succeeded");
                                                 },
@@ -283,7 +301,7 @@
                         console.log("Description Object: ", desc);
                     });
                     /**
-                     * The offerer will send a number of ICE Candidate blobs to the answerer so they 
+                     * The offerer will send a number of ICE Candidate blobs to the answerer so they
                      * can begin trying to find the best path to one another on the net.
                      */
                     signaling_socket.on('iceCandidate', function(config) {
@@ -330,23 +348,28 @@
             /***********************/
             function toggleMyStream() {
                 var audioTracks = local_media_stream.getAudioTracks();
+                var iconElement = $('#self-mute-microphone-icon');
+                var popoverElement = $('#self-mute-microphone-button');
                 if (audioTracks[0]) {
                     if (audioTracks[0].enabled == true) {
                         audioTracks[0].enabled = false;
-                        $('#muteButton').attr('value', 'Unmute');
+                        $(popoverElement).attr('data-content', 'Unmute your microphone');
                         signaling_socket.emit('muted')
                     }
                     else {
                         audioTracks[0].enabled = true;
-                        $('#muteButton').attr('value', 'Mute');
+                        $(popoverElement).attr('data-content', 'Mute your microphone');
                         signaling_socket.emit('unmuted')
                     }
-                    
+
+                    $(iconElement).toggleClass('fa-microphone');
+                    $(iconElement).toggleClass('fa-microphone-slash');
+                    $(popoverElement).toggleClass('btn-warning');
                 }
             }
 
             function change_name() {
-                name = prompt('Entrez votre pseudo');
+                name = prompt('Enter your username');
                 if (name) {
                     NAME = name;
                     signaling_socket.emit('changeName', NAME);
@@ -354,7 +377,7 @@
             }
 
             function start_name() {
-                name = prompt('Entrez votre pseudo');
+                name = prompt('Enter your username');
                 if (name) {
                     NAME = name;
                     init()
@@ -365,16 +388,56 @@
     </head>
     <body onload='start_name()'>
     <div class="container">
-    <div id="listChannelsDiv"><ul id="listChannels"></ul></div>
-        <div id="chat"><div id="chatContent"></div><input type="text" placeholder="Entrez un message" id="chatInput"/></div>
+        <h1 style="text-align: center">Welcome to Zazu.js</h1>
+        <hr>
+        <div class="row">
+            <div class="col-md-6">
+                <div id="listChannelsDiv">
+                    <ul id="listChannels"></ul>
+                </div>
+                <div id="chat"><div id="chatContent">
+                </div>
+                    <div id='autoscroll-chat-container' style='display: inline' onclick='toggleAutoscroll()'>
+                        <a id='autoscroll-chat' class='btn btn-sm' href='#' rel='popover' data-content='Enable Auto-scroll in chat' data-placement='bottom' data-trigger='hover'>
+                            <i id='autoscroll-chat-icon' class='fa fa-pause'></i>
+                        </a>
+                    </div>
+                    <input type="text" placeholder="Entrez un message" id="chatInput"/>
+                </div>
+            </div>
+            <div id="control-panel" class="col-md-6"></div>
+        </div>
 
         <script>
+
+            autoscroll = true;
+
+            function toggleAutoscroll() {
+                var autoscrollChatElement = $('#autoscroll-chat');
+                var autoscrollChatIconElement = $('#autoscroll-chat-icon');
+                autoscroll = !autoscroll;
+                if (autoscroll) {
+                    autoscrollChatElement.attr("data-content", "Disable Auto-scroll in chat");
+                } else {
+                    autoscrollChatElement.attr("data-content", "Enable Auto-scroll in chat");
+                }
+                autoscrollChatIconElement.toggleClass("fa-play");
+                autoscrollChatIconElement.toggleClass("fa-pause");
+            }
+
             $("#chatInput").keyup(function (e) {
                 if (e.keyCode == 13) {
                     signaling_socket.emit('msgSent', $('#chatInput').val());
                     $('#chatInput').val('');
                 }
             });
+
+            function scrollChat() {
+                var objDiv = document.getElementById("chatContent");
+                objDiv.scrollTop = objDiv.scrollHeight;
+            }
+
+
         </script>
     </div>
     </body>
