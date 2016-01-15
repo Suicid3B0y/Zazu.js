@@ -1,97 +1,176 @@
 <!doctype html>
 <html>
-    <head>
-        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-        <script src="http://underscorejs.org/underscore.js"></script>
-        <script src="http://sugarjs.com/release/current/sugar.min.js"></script>
-        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
-        <script src="js/bootstrap-contextmenu.js"></script>
-        <script src="js/bootbox.min.js"></script>
-        <script src="js/adapter.js"></script>
-        <link rel="stylesheet" type="text/css" href="css/bootstrap.css"/>
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-        <link rel="stylesheet" type="text/css" href="css/client.css"/>
-        <link rel="stylesheet" type="text/css" href="css/awesome-bootstrap-checkbox.css"/>
+<head>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script src="http://underscorejs.org/underscore.js"></script>
+    <script src="http://sugarjs.com/release/current/sugar.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
+            integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
+            crossorigin="anonymous"></script>
+    <script src="js/bootstrap-contextmenu.js"></script>
+    <script src="js/bootbox.min.js"></script>
+    <script src="js/adapter.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.css"/>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css" href="css/client.css"/>
+    <link rel="stylesheet" type="text/css" href="css/awesome-bootstrap-checkbox.css"/>
 
-        <script src="/socket.io/socket.io.js"></script>
-        <script>
-            /** CONFIG **/
-            var SIGNALING_SERVER = "";
-            var USE_AUDIO = true;
-            var MICROPHONE_OK = false;
-            var MUTE_AUDIO_BY_DEFAULT = false;
-            var CHANNELS = [];
-            var NAMES = {};
-            var rightClick = null;
-            var NAME = "Noob user";
-            var ICE_SERVERS = [
-                {url:"stun:stun.l.google.com:19302"}
-            ];
-        </script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/utilities.js"></script>
+    <script>
+
+        /** CONFIG **/
+
+        var SIGNALING_SERVER = "";
+        var USE_AUDIO = true;
+        var MICROPHONE_OK = false;
+        var MUTE_AUDIO_BY_DEFAULT = false;
+        var CHANNELS = [];
+        var NAMES = {};
+        var rightClick = null;
+        var NAME = "Noob user";
+        var ICE_SERVERS = [
+            {url: "stun:stun.l.google.com:19302"}
+        ];
+        var CHAT_AUTOSCROLL = true; /* Chat is autoscrolling by default */
+
+        var signaling_socket = null;
+        /* our socket.io connection to our webserver */
+        var local_media_stream = null;
+        /* our own microphone / webcam */
+        var peers = {};
+        /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
+        var peer_media_elements = {};
+        /* keep track of our <video>/<audio> tags, indexed by peer_id */
 
 
-        <script>
-            var signaling_socket = null;   /* our socket.io connection to our webserver */
-            var local_media_stream = null; /* our own microphone / webcam */
-            var peers = {};                /* keep track of our peer connections, indexed by peer_id (aka socket.io id) */
-            var peer_media_elements = {};  /* keep track of our <video>/<audio> tags, indexed by peer_id */
+        /** Utilities functions **/
 
-            function join_chat_channel(channel) {
-                signaling_socket.emit('join', channel);
-                console.log("Try to join channel : "+decodeURI(channel));
+        function isJSON(val) {
+            if (typeof(val) == 'string')
+                return false;
+            try {
+                var jsons = JSON.stringify(val);
+                var json = JSON.parse(jsons);
             }
-            function part_chat_channel(channel) {
-                signaling_socket.emit('part', channel);
+            catch (e) {
+                return false;
             }
-            function isJSON(val){
-                if(typeof(val) == 'string')
-                    return false;
-                try {
-                    var jsons = JSON.stringify(val);
-                    var json = JSON.parse(jsons);
+            return true;
+        }
+
+        function timestamp_to_time(timestamp) {
+            var date = new Date(timestamp * 1000);
+            var hours = date.getHours();
+            var minutes = "0" + date.getMinutes();
+            var seconds = "0" + date.getSeconds();
+            return hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
+        }
+
+        /** Username actions **/
+
+        function ask_username() {
+            bootbox.prompt("Enter an username", function (name) {
+                if (name !== null) {
+                    NAME = name;
+                    init();
+                } else ask_username();
+            });
+        }
+
+        function change_username() {
+            bootbox.prompt("Enter an username", function (name) {
+                if (name !== null) {
+                    NAME = name;
+                    signaling_socket.emit('changeName', NAME);
                 }
-                catch(e){
-                    return false;
-                }
-                return true;
-            }
+            });
+        }
 
-            function create_menu(menu) {
-                res = $("#listChannels");
-                for (var i = 0; i < menu.length; i++) {
-                    if (isJSON(menu[i])) {
-                        add = "<li><div data-id-channel='"+menu[i].id+"'><span class='glyphicon glyphicon-triangle-right'></span>"+menu[i].name+"</div><ul id='channelmenu_"+menu[i].id+"'>"
-                        for (var j = 0; j < menu[i].sockets.length; j++) {
-                            add += "<li data-id-user='"+menu[i].sockets[j]+"'>"+NAMES[menu[i].sockets[j]]+"</li>";
-                        }
-                        add += "</ul></li>";
-                        if (menu[i].father !== null)
-                            $('#channelmenu_'+menu[i].father).append(add)
-                        else
-                            $('#listChannels').append(add);
-                    } else
-                        console.log("Channels list not valid")
-                };
-                $('#listChannels').find('li[data-id-user]')
-                    .on('click', function(e, context) {
+        /** Chat functions **/
+
+        function add_chat_listener() {
+            $("#chatInput").keyup(function (e) {
+                if (e.keyCode == 13) {
+                    signaling_socket.emit('msgSent', {code: 'channel', content: $('#chatInput').val()});
+                    $('#chatInput').val('');
+                }
+            });
+        }
+
+        function join_chat_channel(channel) {
+            signaling_socket.emit('join', channel);
+            console.log("Try to join channel : " + decodeURI(channel));
+        }
+
+        function part_chat_channel(channel) {
+            signaling_socket.emit('part', channel);
+        }
+
+        function scroll_chat() {
+            var objDiv = document.getElementById("chatContent");
+            objDiv.scrollTop = objDiv.scrollHeight;
+        }
+
+        function toggle_autoscroll() {
+            var autoscrollChatElement = $('#autoscroll-chat');
+            var autoscrollChatIconElement = $('#autoscroll-chat-icon');
+            CHAT_AUTOSCROLL = !CHAT_AUTOSCROLL;
+            if (CHAT_AUTOSCROLL) {
+                autoscrollChatElement.attr("data-content", "Disable Auto-scroll in chat");
+            } else {
+                autoscrollChatElement.attr("data-content", "Enable Auto-scroll in chat");
+            }
+            autoscrollChatIconElement.toggleClass("fa-play");
+            autoscrollChatIconElement.toggleClass("fa-pause");
+        }
+
+        /** Menu creation **/
+
+        function create_menu(menu) {
+
+            res = $("#listChannels");
+
+            for (var i = 0; i < menu.length; i++) {
+                if (isJSON(menu[i])) {
+                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-right'></span>" + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
+                    for (var j = 0; j < menu[i].sockets.length; j++) {
+                        add += "<li data-id-user='" + menu[i].sockets[j] + "'>" + NAMES[menu[i].sockets[j]] + "</li>";
+                    }
+                    add += "</ul></li>";
+                    if (menu[i].father !== null)
+                        $('#channelmenu_' + menu[i].father).append(add)
+                    else
+                        $('#listChannels').append(add);
+                } else
+                    console.log("Channels list not valid")
+            }
+            ;
+
+            $('#listChannels').find('li[data-id-user]')
+                    .on('click', function (e, context) {
                         idUser = $(this).data().idUser;
-                        console.log('Left click on '+NAMES[idUser]);
+                        console.log('Left click on ' + NAMES[idUser]);
 
                     })
                     .contextmenu({
-                        target:'#contextMenu',
-                        before: function(e,context) {
+                        target: '#contextMenu',
+                        before: function (e, context) {
                             rightClick = context;
                             $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Private message</a></li><li><a tabindex="-1">Mute</a></li>';
                         },
-                        onItem: function(context,e) {
+                        onItem: function (context, e) {
                             idUser = rightClick.data().idUser;
-                            console.log($(e.target).text()+" on "+NAMES[idUser]);
+                            console.log($(e.target).text() + " on " + NAMES[idUser]);
                             switch ($(e.target).text()) {
                                 case "Private message":
-                                    bootbox.prompt("Enter a message for "+NAMES[idUser], function(msg) {
+                                    bootbox.prompt("Enter a message for " + NAMES[idUser], function (msg) {
                                         if (msg !== null) {
-                                            signaling_socket.emit("msgSent", {code:"private", receiver_id:idUser, content:msg});
+                                            signaling_socket.emit("msgSent", {
+                                                code: "private",
+                                                receiver_id: idUser,
+                                                content: msg
+                                            });
                                         }
                                     });
                                     break;
@@ -100,42 +179,45 @@
                             }
                         }
                     });
-                $('#listChannels').find('div[data-id-channel]')
-                    .on('click', function(e, context) {
-                        console.log('Left click on '+$(this).text());
+
+            $('#listChannels').find('div[data-id-channel]')
+                    .on('click', function (e, context) {
+                        console.log('Left click on ' + $(this).text());
                     })
                     .contextmenu({
-                        target:'#contextMenu',
-                        before: function(e, context) {
+                        target: '#contextMenu',
+                        before: function (e, context) {
                             rightClick = context;
                             $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Join channel</a></li><li><a tabindex="-1">Edit name</a></li>';
                         },
-                        onItem: function(context, e) {
+                        onItem: function (context, e) {
                             channel = rightClick.data().idChannel;
-                            console.log($(e.target).text()+" on channel '"+rightClick.text()+"'");
+                            console.log($(e.target).text() + " on channel '" + rightClick.text() + "'");
                             switch ($(e.target).text()) {
                                 case "Join channel":
                                     join_chat_channel(channel);
                                     break;
                                 case "Edit name":
-                                    name = prompt("Enter a new name for channel '"+rightClick.text()+"'");
-                                    signaling_socket.emit('editNameChannel', {id:channel, name:name});
+                                    name = prompt("Enter a new name for channel '" + rightClick.text() + "'");
+                                    signaling_socket.emit('editNameChannel', {id: channel, name: name});
                                     break;
                             }
                         }
                     })
-            }
+        }
 
-            function setup_local_media(callback, errorback) {
-                if (local_media_stream != null) {  /* ie, if we've already been initialized */
-                    if (callback) callback();
-                    return;
-                }
-                /* Ask user for permission to use the computers microphone and/or camera,
-                 * attach it to an <audio> or <video> tag if they give us access. */
-                console.log("Requesting access to local audio / video inputs");
-                getUserMedia({"audio":USE_AUDIO},
-                    function(stream) { /* user accepted access to a/v */
+        /** Local media actions **/
+
+        function setup_local_media(callback, errorback) {
+            if (local_media_stream != null) {  /* ie, if we've already been initialized */
+                if (callback) callback();
+                return;
+            }
+            /* Ask user for permission to use the computers microphone and/or camera,
+             * attach it to an <audio> or <video> tag if they give us access. */
+            console.log("Requesting access to local audio / video inputs");
+            getUserMedia({"audio": USE_AUDIO},
+                    function (stream) { /* user accepted access to a/v */
                         console.log("Access granted to audio/video");
                         local_media_stream = stream;
                         var local_media = $("<audio>");
@@ -144,381 +226,343 @@
                         local_media.attr('id', "myAudio");
                         var controlPanelElement = $('#control-panel');
                         controlPanelElement.append("<div><b>Options :<b><br></div>"
-                            + "<div id='myInterface'>"
-                            + "<div id='self-mute-microphone-container' style='display: inline' rel='microphone-container' onclick='toggleMyStream()'>"
-                            + "<a id='self-mute-microphone-button' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Mute your microphone' data-placement='bottom' data-trigger='hover'>"
-                            + "<i id='self-mute-microphone-icon' class='fa fa-microphone'></i>"
-                            + "</a>"
-                            + "</div>"
-                            + "<input type='button' id='changeNameButton' class='btn btn-sm' onclick='change_name()' value='Change username'>"
-                            + "<br>");
+                                + "<div id='myInterface'>"
+                                + "<div id='self-mute-microphone-container' style='display: inline' rel='microphone-container' onclick='toggle_my_stream()'>"
+                                + "<a id='self-mute-microphone-button' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Mute your microphone' data-placement='bottom' data-trigger='hover'>"
+                                + "<i id='self-mute-microphone-icon' class='fa fa-microphone'></i>"
+                                + "</a>"
+                                + "</div>"
+                                + "<input type='button' id='changeNameButton' class='btn btn-sm' onclick='change_username()' value='Change username'>"
+                                + "<br>");
                         $('a[rel="popover"]').popover();
                         $('#myInterface').append(local_media);
                         controlPanelElement.append('<div><b>Channel user volumes :<b><br></div>');
                         attachMediaStream(local_media[0], stream);
-			MICROPHONE_OK = true;
-			if (callback) callback();
+                        MICROPHONE_OK = true;
+                        if (callback) callback();
                     },
-                    function() { /* user denied access to a/v */
-			console.log("Access denied for audio/video");
-			$('body').append("Me : <br><div id='myInterface'><input type='button' id='changeNameButton' onclick='change_name()' value='Changer de nom'><br>");
-			$('body').append('<br>Others :<br>');
+                    function () { /* user denied access to a/v */
+                        console.log("Access denied for audio/video");
+                        $('body').append("Me : <br><div id='myInterface'><input type='button' id='changeNameButton' onclick='change_username()' value='Changer de nom'><br>");
+                        $('body').append('<br>Others :<br>');
                         if (callback) callback();
                     });
+        }
+
+        function toggle_my_stream() {
+            var audioTracks = local_media_stream.getAudioTracks();
+            var iconElement = $('#self-mute-microphone-icon');
+            var popoverElement = $('#self-mute-microphone-button');
+            if (audioTracks[0]) {
+                if (audioTracks[0].enabled == true) {
+                    audioTracks[0].enabled = false;
+                    $(popoverElement).attr('data-content', 'Unmute your microphone');
+                    signaling_socket.emit('muted')
+                }
+                else {
+                    audioTracks[0].enabled = true;
+                    $(popoverElement).attr('data-content', 'Mute your microphone');
+                    signaling_socket.emit('unmuted')
+                }
+
+                $(iconElement).toggleClass('fa-microphone');
+                $(iconElement).toggleClass('fa-microphone-slash');
+                $(popoverElement).toggleClass('btn-warning');
             }
+        }
 
-            function init() {
-                console.log("Connecting to signaling server");
-                setup_local_media(function() {
-                    signaling_socket = io.connect(SIGNALING_SERVER, {query:"name="+NAME+"&microphone_ok="+MICROPHONE_OK});
-                    signaling_socket.on('connect', function() {
-                        console.log("Connected to signaling server");
-                        $('#chat').append('<input type="text" placeholder="Entrez un message" id="chatInput"/>');
-                        addChatListener();
-                    });
-                    signaling_socket.on('disconnect', function() {
-                        console.log("Disconnected from signaling server");
-                        /* Tear down all of our peer connections and remove all the
-                         * media divs when we disconnect */
-                        for (peer_id in peer_media_elements) {
-                            peer_media_elements[peer_id].remove();
-                        }
-                        for (peer_id in peers) {
-                            peers[peer_id].close();
-                        }
-                        peers = {};
-                        peer_media_elements = {};
-                    });
+        /** Listeners initialization on socket **/
 
-                    signaling_socket.on('joinSuccess', function(channel) {
-                        for (peer_id in peer_media_elements)
-                            peer_media_elements[peer_id].remove();
-                        console.log("Join channel : "+decodeURI(channel));
-                    })
+        function init() {
+            console.log("Connecting to signaling server");
+            setup_local_media(function () {
+                signaling_socket = io.connect(SIGNALING_SERVER, {query: "name=" + NAME + "&microphone_ok=" + MICROPHONE_OK});
 
-                    signaling_socket.on('listChannels', function(channels) {
-                        if (! _.isEqual(channels, CHANNELS)) {
-                            CHANNELS = channels;
-                            $('#listChannels').empty();
-                            create_menu(CHANNELS);
-                        }
-                    })
+                /** Login actions **/
 
-                    signaling_socket.on('listNames', function(names) {
-                        if (! _.isEqual(names, NAMES)) {
-                            NAMES = names;
-                            $('#listChannels').empty();
-                            create_menu(CHANNELS);
-                        }
-                    })
-                    function getListChannelsAndNames() {
-                        signaling_socket.emit('getListChannelsAndNames');
+                signaling_socket.on('connect', function () {
+                    console.log("Connected to signaling server");
+                    $('#chat').append("<input type='text' placeholder='Entrez un message' id='chatInput'/>" +
+                            "<div id='autoscroll-chat-container' style='display: inline' onclick='toggle_autoscroll()'>"
+                            + "<a id='autoscroll-chat' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Enable Auto-scroll in chat' data-placement='bottom' data-trigger='hover'>"
+                            + "<i id='autoscroll-chat-icon' class='fa fa-pause'></i>"
+                            + "</a>"
+                            + "</div>");
+                    add_chat_listener();
+                });
+
+                signaling_socket.on('disconnect', function () {
+                    console.log("Disconnected from signaling server");
+                    /* Tear down all of our peer connections and remove all the
+                     * media divs when we disconnect */
+                    for (peer_id in peer_media_elements) {
+                        peer_media_elements[peer_id].remove();
                     }
-                    getListChannelsAndNamesInterval = setInterval(getListChannelsAndNames, 200)
+                    for (peer_id in peers) {
+                        peers[peer_id].close();
+                    }
+                    peers = {};
+                    peer_media_elements = {};
+                });
 
-                    function timestampToTime(timestamp) {
-                        var date = new Date(timestamp*1000);
-                        var hours = date.getHours();
-                        var minutes = "0" + date.getMinutes();
-                        var seconds = "0" + date.getSeconds();
-                        return hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
+                /** Channel actions **/
+
+                signaling_socket.on('joinSuccess', function (channel) {
+                    for (peer_id in peer_media_elements)
+                        peer_media_elements[peer_id].remove();
+                    console.log("Join channel : " + decodeURI(channel));
+                })
+
+                signaling_socket.on('listChannels', function (channels) {
+                    if (!_.isEqual(channels, CHANNELS)) {
+                        CHANNELS = channels;
+                        $('#listChannels').empty();
+                        create_menu(CHANNELS);
+                    }
+                })
+
+                /** User interactions **/
+
+                signaling_socket.on('msgReceived', function (msg) {
+                    console.log(msg);
+                    var chatContentElement = $('#chatContent');
+                    switch (msg.code) {
+                        case "disconnect":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] <b>" + NAMES[msg.author_id] + "</b> has disconnected.</span><br>");
+                            break;
+                        case "connect":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] <b>" + NAMES[msg.author_id] + "</b> has connected.</span><br>");
+                            break;
+                        case "moveChannelIn":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] <b>" + NAMES[msg.author_id] + "</b> has joined the channel.</span><br>");
+                            break;
+                        case "moveChannelOut":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] <b>" + NAMES[msg.author_id] + "</b> has left the channel.</span><br>");
+                            break;
+                        case "moveSelf":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] You moved to channel <b>" + msg.content + "</b>.</span><br>");
+                            break;
+                        case "channel":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] (Channel) <b>" + NAMES[msg.author_id] + "</b> : " + msg.content + "</span><br>");
+                            break;
+                        case "privateIn":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] <b>" + NAMES[msg.author_id] + "</b> : " + msg.content + "</span><br>");
+                            break;
+                        case "privateOut":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] To <b>" + NAMES[msg.receiver_id] + "</b> : " + msg.content + "</span><br>");
+                            break;
+                        default:
+                            break;
                     }
 
-                    signaling_socket.on('msgReceived', function(msg) {
-                        console.log(msg);
-                        var chatContentElement = $('#chatContent');
-                        switch (msg.code) {
-                            case "disconnect":
-                                chatContentElement.append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has disconnected.</span><br>");
-                                break;
-                            case "connect":
-                                chatContentElement.append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has connected.</span><br>");
-                                break;
-                            case "moveChannelIn":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has joined the channel.</span><br>");
-                                break;
-                            case "moveChannelOut":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> has left the channel.</span><br>");
-                                break;
-                            case "moveSelf":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] You moved to channel <b>"+msg.content+"</b>.</span><br>");
-                                break;
-                            case "channel":
-                                chatContentElement.append("<span>["+timestampToTime(msg.date)+"] (Channel) <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
-                                break;
-                            case "privateIn":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] <b>"+NAMES[msg.author_id]+"</b> : "+msg.content+"</span><br>");
-                                break;
-                            case "privateOut":
-                                $('#chatContent').append("<span>["+timestampToTime(msg.date)+"] To <b>"+NAMES[msg.receiver_id]+"</b> : "+msg.content+"</span><br>");
-                                break;
-                            default:
-                                break;
-                        }
-                        console.log(autoscroll);
-                        if (autoscroll) {
-                            scrollChat();
-                        }
-                    });
+                    if (CHAT_AUTOSCROLL) {
+                        scroll_chat();
+                    }
+                });
 
-                    /**
-                    * When we join a group, our signaling server will send out 'addPeer' events to each pair
-                    * of users in the group (creating a fully-connected graph of users, ie if there are 6 people
-                    * in the channel you will connect directly to the other 5, so there will be a total of 15
-                    * connections in the network).
-                    */
-                    signaling_socket.on('addPeer', function(config) {
-                        console.log('Signaling server said to add peer:', config);
-                        var peer_id = config.peer_id;
-                        var peer_connection = new RTCPeerConnection(
+                signaling_socket.on('muted', function (peer) {
+                    $('#' + peer.peer_id.from(2)).prepend('<span class="muted">Muted</span>');
+                })
+
+                signaling_socket.on('unmuted', function (peer) {
+                    $('#' + peer.peer_id.from(2)).find('.muted').remove();
+                })
+
+                signaling_socket.on('listNames', function (names) {
+                    if (!_.isEqual(names, NAMES)) {
+                        NAMES = names;
+                        $('#listChannels').empty();
+                        create_menu(CHANNELS);
+                    }
+                })
+
+                function getListChannelsAndNames() {
+                    signaling_socket.emit('getListChannelsAndNames');
+                }
+
+                getListChannelsAndNamesInterval = setInterval(getListChannelsAndNames, 200)
+
+                /** WebRTC functions **/
+
+                /**
+                 * When we join a group, our signaling server will send out 'addPeer' events to each pair
+                 * of users in the group (creating a fully-connected graph of users, ie if there are 6 people
+                 * in the channel you will connect directly to the other 5, so there will be a total of 15
+                 * connections in the network).
+                 */
+                signaling_socket.on('addPeer', function (config) {
+                    console.log('Signaling server said to add peer:', config);
+                    var peer_id = config.peer_id;
+                    var peer_connection = new RTCPeerConnection(
                             {"iceServers": ICE_SERVERS},
                             {"optional": [{"DtlsSrtpKeyAgreement": true}]} /* this will no longer be needed by chrome
-                                                                            * eventually (supposedly), but is necessary
-                                                                            * for now to get firefox to talk to chrome */
-                        );
-                        peers[peer_id] = peer_connection;
-                        peer_connection.onicecandidate = function(event) {
-                            if (event.candidate) {
-                                signaling_socket.emit('relayICECandidate', {
-                                    'peer_id': peer_id,
-                                    'ice_candidate': {
-                                        'sdpMLineIndex': event.candidate.sdpMLineIndex,
-                                        'candidate': event.candidate.candidate
-                                    }
-                                });
-                            }
+                             * eventually (supposedly), but is necessary
+                             * for now to get firefox to talk to chrome */
+                    );
+                    peers[peer_id] = peer_connection;
+                    peer_connection.onicecandidate = function (event) {
+                        if (event.candidate) {
+                            signaling_socket.emit('relayICECandidate', {
+                                'peer_id': peer_id,
+                                'ice_candidate': {
+                                    'sdpMLineIndex': event.candidate.sdpMLineIndex,
+                                    'candidate': event.candidate.candidate
+                                }
+                            });
                         }
-                        peer_connection.onaddstream = function(event) {
-                            console.log("onAddStream", event);
-                            var remote_media = $("<audio>");
-                            remote_media.attr("autoplay", "autoplay");
-                            if (MUTE_AUDIO_BY_DEFAULT) {
-                                remote_media.attr("muted", "true");
-                            }
-                            remote_media.attr("controls", "");
-                            remote_media.attr("id", 'audio_'+peer_id);
-                            console.log(peer_id.from(2));
-                            $('#control-panel').append('<div id="'+peer_id.from(2)+'"></div>');
-                            $('#'+peer_id.from(2)).append(remote_media);
+                    }
+                    peer_connection.onaddstream = function (event) {
+                        console.log("onAddStream", event);
+                        var remote_media = $("<audio>");
+                        remote_media.attr("autoplay", "autoplay");
+                        if (MUTE_AUDIO_BY_DEFAULT) {
+                            remote_media.attr("muted", "true");
+                        }
+                        remote_media.attr("controls", "");
+                        remote_media.attr("id", 'audio_' + peer_id);
+                        console.log(peer_id.from(2));
+                        $('#control-panel').append('<div id="' + peer_id.from(2) + '"></div>');
+                        $('#' + peer_id.from(2)).append(remote_media);
 
-                            peer_media_elements[peer_id] = $('#'+peer_id.from(2));
-                            attachMediaStream(remote_media[0], event.stream);
-                        }
-                        /* Add our local stream */
-                        peer_connection.addStream(local_media_stream);
-                        /* Only one side of the peer connection should create the
-                         * offer, the signaling server picks one to be the offerer.
-                         * The other user will get a 'sessionDescription' event and will
-                         * create an offer, then send back an answer 'sessionDescription' to us
-                         */
-                        if (config.should_create_offer) {
-                            console.log("Creating RTC offer to ", peer_id);
-                            peer_connection.createOffer(
+                        peer_media_elements[peer_id] = $('#' + peer_id.from(2));
+                        attachMediaStream(remote_media[0], event.stream);
+                    }
+                    /* Add our local stream */
+                    peer_connection.addStream(local_media_stream);
+                    /* Only one side of the peer connection should create the
+                     * offer, the signaling server picks one to be the offerer.
+                     * The other user will get a 'sessionDescription' event and will
+                     * create an offer, then send back an answer 'sessionDescription' to us
+                     */
+                    if (config.should_create_offer) {
+                        console.log("Creating RTC offer to ", peer_id);
+                        peer_connection.createOffer(
                                 function (local_description) {
                                     console.log("Local offer description is: ", local_description);
                                     peer_connection.setLocalDescription(local_description,
-                                        function() {
-                                            signaling_socket.emit('relaySessionDescription',
-                                                {'peer_id': peer_id, 'session_description': local_description});
-                                            console.log("Offer setLocalDescription succeeded");
-                                        },
-                                        function() { Alert("Offer setLocalDescription failed!"); }
+                                            function () {
+                                                signaling_socket.emit('relaySessionDescription',
+                                                        {'peer_id': peer_id, 'session_description': local_description});
+                                                console.log("Offer setLocalDescription succeeded");
+                                            },
+                                            function () {
+                                                Alert("Offer setLocalDescription failed!");
+                                            }
                                     );
                                 },
                                 function (error) {
                                     console.log("Error sending offer: ", error);
                                 });
-                        }
-                    });
-                    /**
-                     * Peers exchange session descriptions which contains information
-                     * about their audio / video settings and that sort of stuff. First
-                     * the 'offerer' sends a description to the 'answerer' (with type
-                     * "offer"), then the answerer sends one back (with type "answer").
-                     */
-                    signaling_socket.on('sessionDescription', function(config) {
-                        console.log('Remote description received: ', config);
-                        var peer_id = config.peer_id;
-                        var peer = peers[peer_id];
-                        var remote_description = config.session_description;
-                        console.log(config.session_description);
-                        var desc = new RTCSessionDescription(remote_description);
-                        var stuff = peer.setRemoteDescription(desc,
-                            function() {
+                    }
+                });
+
+                /**
+                 * Peers exchange session descriptions which contains information
+                 * about their audio / video settings and that sort of stuff. First
+                 * the 'offerer' sends a description to the 'answerer' (with type
+                 * "offer"), then the answerer sends one back (with type "answer").
+                 */
+                signaling_socket.on('sessionDescription', function (config) {
+                    console.log('Remote description received: ', config);
+                    var peer_id = config.peer_id;
+                    var peer = peers[peer_id];
+                    var remote_description = config.session_description;
+                    console.log(config.session_description);
+                    var desc = new RTCSessionDescription(remote_description);
+                    var stuff = peer.setRemoteDescription(desc,
+                            function () {
                                 console.log("setRemoteDescription succeeded");
                                 if (remote_description.type == "offer") {
                                     console.log("Creating answer");
                                     peer.createAnswer(
-                                        function(local_description) {
-                                            console.log("Answer description is: ", local_description);
-                                            peer.setLocalDescription(local_description,
-                                                function() {
-                                                    signaling_socket.emit('relaySessionDescription',
-                                                        {'peer_id': peer_id, 'session_description': local_description});
-                                                    console.log("Answer setLocalDescription succeeded");
-                                                },
-                                                function() { Alert("Answer setLocalDescription failed!"); }
-                                            );
-                                        },
-                                        function(error) {
-                                            console.log("Error creating answer: ", error);
-                                            console.log(peer);
-                                        });
+                                            function (local_description) {
+                                                console.log("Answer description is: ", local_description);
+                                                peer.setLocalDescription(local_description,
+                                                        function () {
+                                                            signaling_socket.emit('relaySessionDescription',
+                                                                    {
+                                                                        'peer_id': peer_id,
+                                                                        'session_description': local_description
+                                                                    });
+                                                            console.log("Answer setLocalDescription succeeded");
+                                                        },
+                                                        function () {
+                                                            Alert("Answer setLocalDescription failed!");
+                                                        }
+                                                );
+                                            },
+                                            function (error) {
+                                                console.log("Error creating answer: ", error);
+                                                console.log(peer);
+                                            });
                                 }
                             },
-                            function(error) {
+                            function (error) {
                                 console.log("setRemoteDescription error: ", error);
                             }
-                        );
-                        console.log("Description Object: ", desc);
-                    });
-                    /**
-                     * The offerer will send a number of ICE Candidate blobs to the answerer so they
-                     * can begin trying to find the best path to one another on the net.
-                     */
-                    signaling_socket.on('iceCandidate', function(config) {
-                        var peer = peers[config.peer_id];
-                        var ice_candidate = config.ice_candidate;
-                        peer.addIceCandidate(new RTCIceCandidate(ice_candidate));
-                    });
-                    /**
-                     * When a user leaves a channel (or is disconnected from the
-                     * signaling server) everyone will recieve a 'removePeer' message
-                     * telling them to trash the media channels they have open for those
-                     * that peer. If it was this client that left a channel, they'll also
-                     * receive the removePeers. If this client was disconnected, they
-                     * wont receive removePeers, but rather the
-                     * signaling_socket.on('disconnect') code will kick in and tear down
-                     * all the peer sessions.
-                     */
-                    signaling_socket.on('removePeer', function(config) {
-                        console.log('Signaling server said to remove peer:', config);
-                        var peer_id = config.peer_id;
-                        if (peer_id in peer_media_elements) {
-                            peer_media_elements[peer_id].remove();
-                        }
-                        if (peer_id in peers) {
-                            peers[peer_id].close();
-                        }
-                        delete peers[peer_id];
-                        delete peer_media_elements[config.peer_id];
-                    });
-                    /**
-                     * User interactions
-                     */
-                    signaling_socket.on('muted', function(peer) {
-                        $('#'+peer.peer_id.from(2)).prepend('<span class="muted">Muted</span>');
-                    })
-
-                    signaling_socket.on('unmuted', function(peer) {
-                        $('#'+peer.peer_id.from(2)).find('.muted').remove();
-                    })
+                    );
+                    console.log("Description Object: ", desc);
                 });
-            }
-            /***********************/
-            /** Local media stuff **/
-            /***********************/
-            function toggleMyStream() {
-                var audioTracks = local_media_stream.getAudioTracks();
-                var iconElement = $('#self-mute-microphone-icon');
-                var popoverElement = $('#self-mute-microphone-button');
-                if (audioTracks[0]) {
-                    if (audioTracks[0].enabled == true) {
-                        audioTracks[0].enabled = false;
-                        $(popoverElement).attr('data-content', 'Unmute your microphone');
-                        signaling_socket.emit('muted')
-                    }
-                    else {
-                        audioTracks[0].enabled = true;
-                        $(popoverElement).attr('data-content', 'Mute your microphone');
-                        signaling_socket.emit('unmuted')
-                    }
 
-                    $(iconElement).toggleClass('fa-microphone');
-                    $(iconElement).toggleClass('fa-microphone-slash');
-                    $(popoverElement).toggleClass('btn-warning');
-                }
-            }
-
-            function change_name() {
-                bootbox.prompt("Enter an username", function(name) {
-                    if (name !== null) {
-                        NAME = name;
-                        signaling_socket.emit('changeName', NAME);
-                    }
+                /**
+                 * The offerer will send a number of ICE Candidate blobs to the answerer so they
+                 * can begin trying to find the best path to one another on the net.
+                 */
+                signaling_socket.on('iceCandidate', function (config) {
+                    var peer = peers[config.peer_id];
+                    var ice_candidate = config.ice_candidate;
+                    peer.addIceCandidate(new RTCIceCandidate(ice_candidate));
                 });
-            }
 
-            function start_name() {
-                bootbox.prompt("Enter an username", function(name) {
-                    if (name !== null) {
-                        NAME = name;
-                        init();
-                    } else start_name();
+                /**
+                 * When a user leaves a channel (or is disconnected from the
+                 * signaling server) everyone will recieve a 'removePeer' message
+                 * telling them to trash the media channels they have open for those
+                 * that peer. If it was this client that left a channel, they'll also
+                 * receive the removePeers. If this client was disconnected, they
+                 * wont receive removePeers, but rather the
+                 * signaling_socket.on('disconnect') code will kick in and tear down
+                 * all the peer sessions.
+                 */
+                signaling_socket.on('removePeer', function (config) {
+                    console.log('Signaling server said to remove peer:', config);
+                    var peer_id = config.peer_id;
+                    if (peer_id in peer_media_elements) {
+                        peer_media_elements[peer_id].remove();
+                    }
+                    if (peer_id in peers) {
+                        peers[peer_id].close();
+                    }
+                    delete peers[peer_id];
+                    delete peer_media_elements[config.peer_id];
                 });
-            }
 
-        </script>
-    </head>
-    <body onload='start_name()'>
-    <div class="container">
-        <h1 style="text-align: center">Welcome to Zazu.js</h1>
-        <hr>
-        <div class="row">
-            <div class="col-md-6">
-                <div id="listChannelsDiv">
-                    <ul id="listChannels"></ul>
-                </div>
-                <div id="chat">
-                    <div id="chatContent"></div>
-                    <div id='autoscroll-chat-container' style='display: inline' onclick='toggleAutoscroll()'>
-                        <a id='autoscroll-chat' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Enable Auto-scroll in chat' data-placement='bottom' data-trigger='hover'>
-                            <i id='autoscroll-chat-icon' class='fa fa-pause'></i>
-                        </a>
-                    </div>
-                </div>
+            });
+        }
+
+    </script>
+
+</head>
+<body onload='ask_username()'>
+<div class="container">
+    <h1 style="text-align: center">Welcome to Zazu !</h1>
+    <hr>
+    <div class="row">
+        <div class="col-md-6">
+            <div id="listChannelsDiv">
+                <ul id="listChannels"></ul>
             </div>
-            <div id="control-panel" class="col-md-6"></div>
-            <div id="contextMenu">
-                <ul class="dropdown-menu" role="menu">
-                </ul>
+            <div id="chat">
+                <div id="chatContent"></div>
             </div>
         </div>
+        <div id="control-panel" class="col-md-6"></div>
+        <div id="contextMenu">
+            <ul class="dropdown-menu" role="menu">
+            </ul>
+        </div>
     </div>
+</div>
 
-
-        <script>
-
-            autoscroll = true;
-
-            function toggleAutoscroll() {
-                var autoscrollChatElement = $('#autoscroll-chat');
-                var autoscrollChatIconElement = $('#autoscroll-chat-icon');
-                autoscroll = !autoscroll;
-                if (autoscroll) {
-                    autoscrollChatElement.attr("data-content", "Disable Auto-scroll in chat");
-                } else {
-                    autoscrollChatElement.attr("data-content", "Enable Auto-scroll in chat");
-                }
-                autoscrollChatIconElement.toggleClass("fa-play");
-                autoscrollChatIconElement.toggleClass("fa-pause");
-            }
-
-            function addChatListener() {
-                $("#chatInput").keyup(function (e) {
-                    if (e.keyCode == 13) {
-                        signaling_socket.emit('msgSent', {code:'channel', content:$('#chatInput').val()});
-                        $('#chatInput').val('');
-                    }
-                });
-            }
-
-            function scrollChat() {
-                var objDiv = document.getElementById("chatContent");
-                objDiv.scrollTop = objDiv.scrollHeight;
-            }
-
-
-        </script>
-    </body>
+</body>
 </html>
