@@ -4,6 +4,8 @@
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
         <script src="http://underscorejs.org/underscore.js"></script>
         <script src="http://sugarjs.com/release/current/sugar.min.js"></script>
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+        <script src="bootstrap-contextmenu.js"></script>
         <script src="adapter.js"></script>
         <style>
             html, body { 
@@ -18,10 +20,11 @@
             /** CONFIG **/
             var SIGNALING_SERVER = "";
             var USE_AUDIO = true;
-	    var MICROPHONE_OK = false;
+            var MICROPHONE_OK = false;
             var MUTE_AUDIO_BY_DEFAULT = false;
             var CHANNELS = [];
             var NAMES = {};
+            var rightClick = null;
             var NAME = "Noob user";
             var ICE_SERVERS = [
                 {url:"stun:stun.l.google.com:19302"}
@@ -59,7 +62,7 @@
                 res = $("#listChannels");
                 for (var i = 0; i < menu.length; i++) {
                     if (isJSON(menu[i])) {
-                        add = "<li><span id='channel_"+menu[i].id+"' onclick='join_chat_channel("+menu[i].id+")'>"+menu[i].name+"</span><ul id='channelmenu_"+menu[i].id+"'>"
+                        add = "<li><div data-id-channel='"+menu[i].id+"'>"+menu[i].name+"</div><ul id='channelmenu_"+menu[i].id+"'>"
                         for (var j = 0; j < menu[i].sockets.length; j++) {
                             add += "<li data-id-user='"+menu[i].sockets[j]+"'>"+NAMES[menu[i].sockets[j]]+"</li>";
                         }
@@ -71,6 +74,53 @@
                     } else 
                         console.log("Channels list not valid")
                 };
+                $('#listChannels').find('li[data-id-user]')
+                    .on('click', function(e, context) {
+                        idUser = $(this).data().idUser;
+                        console.log('Left click on '+NAMES[idUser]);
+
+                    })
+                    .contextmenu({
+                        target:'#contextMenuUser', 
+                        before: function(e,context) {
+                            rightClick = context;
+                        },
+                        onItem: function(context,e) {
+                            idUser = rightClick.data().idUser;
+                            console.log($(e.target).text()+" on "+NAMES[idUser]);
+                            switch ($(e.target).text()) {
+                                case "Private message":
+                                    msg = prompt("Enter a message for "+NAMES[idUser]);
+                                    signaling_socket.emit("msgSent", {code:"private", receiver_id:idUser, content:msg});
+                                    break;
+                                case "Mute":
+                                    break;
+                            }
+                        }
+                    });
+                $('#listChannels').find('div[data-id-channel]')
+                    .on('click', function(e, context) {
+                        console.log('Left click on '+$(this).text());
+                    })
+                    .contextmenu({
+                        target:'#contextMenuChannel',
+                        before: function(e, context) {
+                            rightClick = context;
+                        },
+                        onItem: function(context, e) {
+                            channel = rightClick.data().idChannel;
+                            console.log($(e.target).text()+" on channel '"+rightClick.text()+"'");
+                            switch ($(e.target).text()) {
+                                case "Join channel":
+                                    join_chat_channel(channel);
+                                    break;
+                                case "Edit name":
+                                    name = prompt("Enter a new name for channel '"+rightClick.text()+"'");
+                                    signaling_socket.emit('editNameChannel', {id:channel, name:name});
+                                    break;
+                            }
+                        }
+                    })
             }
 
             function setup_local_media(callback, errorback) {
@@ -387,6 +437,20 @@
     <body onload='start_name()'>
         <div id="listChannelsDiv"><ul id="listChannels"></ul></div>
         <div id="chat"><div id="chatContent"></div><input type="text" placeholder="Entrez un message" id="chatInput"/></div>
+        
+        <div id="contextMenuUser">
+            <ul class="dropdown-menu" role="menu">
+                <li><a tabindex="-1">Private message</a></li>
+                <li><a tabindex="-1">Mute</a></li>
+            </ul>
+        </div>
+
+        <div id="contextMenuChannel">
+            <ul class="dropdown-menu" role="menu">
+                <li><a tabindex="-1">Join channel</a></li>
+                <li><a tabindex="-1">Edit name</a></li>
+            </ul>
+        </div>
 
         <script>
             $("#chatInput").keyup(function (e) {
