@@ -5,15 +5,17 @@
         <script src="http://underscorejs.org/underscore.js"></script>
         <script src="http://sugarjs.com/release/current/sugar.min.js"></script>
         <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
-        <script src="bootstrap-contextmenu.js"></script>
-        <script src="adapter.js"></script>
+        <script src="js/bootstrap-contextmenu.js"></script>
+        <script src="js/bootbox.min.js"></script>
+        <script src="js/adapter.js"></script>
         <style>
             html, body { 
                 background-color: #555; 
             }
         </style>
 
-        <link rel="stylesheet" type="text/css" href="bootstrap.css"/>
+        <link rel="stylesheet" type="text/css" href="css/bootstrap.css"/>
+        <link rel="stylesheet" type="text/css" href="css/font-awesome.min.css"/>
         
         <script src="/socket.io/socket.io.js"></script>
         <script>
@@ -62,7 +64,7 @@
                 res = $("#listChannels");
                 for (var i = 0; i < menu.length; i++) {
                     if (isJSON(menu[i])) {
-                        add = "<li><div data-id-channel='"+menu[i].id+"'>"+menu[i].name+"</div><ul id='channelmenu_"+menu[i].id+"'>"
+                        add = "<li><div data-id-channel='"+menu[i].id+"'><span class='glyphicon glyphicon-triangle-right'></span>"+menu[i].name+"</div><ul id='channelmenu_"+menu[i].id+"'>"
                         for (var j = 0; j < menu[i].sockets.length; j++) {
                             add += "<li data-id-user='"+menu[i].sockets[j]+"'>"+NAMES[menu[i].sockets[j]]+"</li>";
                         }
@@ -81,17 +83,21 @@
 
                     })
                     .contextmenu({
-                        target:'#contextMenuUser', 
+                        target:'#contextMenu', 
                         before: function(e,context) {
                             rightClick = context;
+                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Private message</a></li><li><a tabindex="-1">Mute</a></li>';
                         },
                         onItem: function(context,e) {
                             idUser = rightClick.data().idUser;
                             console.log($(e.target).text()+" on "+NAMES[idUser]);
                             switch ($(e.target).text()) {
                                 case "Private message":
-                                    msg = prompt("Enter a message for "+NAMES[idUser]);
-                                    signaling_socket.emit("msgSent", {code:"private", receiver_id:idUser, content:msg});
+                                    bootbox.prompt("Enter a message for "+NAMES[idUser], function(msg) {
+                                        if (msg !== null) {
+                                            signaling_socket.emit("msgSent", {code:"private", receiver_id:idUser, content:msg});
+                                        }
+                                    });
                                     break;
                                 case "Mute":
                                     break;
@@ -103,9 +109,10 @@
                         console.log('Left click on '+$(this).text());
                     })
                     .contextmenu({
-                        target:'#contextMenuChannel',
+                        target:'#contextMenu',
                         before: function(e, context) {
                             rightClick = context;
+                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Join channel</a></li><li><a tabindex="-1">Edit name</a></li>';
                         },
                         onItem: function(context, e) {
                             channel = rightClick.data().idChannel;
@@ -161,6 +168,7 @@
                     signaling_socket = io.connect(SIGNALING_SERVER, {query:"name="+NAME+"&microphone_ok="+MICROPHONE_OK});
                     signaling_socket.on('connect', function() {
                         console.log("Connected to signaling server");
+                        $('#chat').append('<input type="text" placeholder="Entrez un message" id="chatInput"/>');
                     });
                     signaling_socket.on('disconnect', function() {
                         console.log("Disconnected from signaling server");
@@ -417,38 +425,31 @@
             }
 
             function change_name() {
-                name = prompt('Entrez votre pseudo');
-                if (name) {
-                    NAME = name;
-                    signaling_socket.emit('changeName', NAME);
-                }
+                bootbox.prompt("Enter an username", function(name) {
+                    if (name !== null) { 
+                        NAME = name;
+                        signaling_socket.emit('changeName', NAME);
+                    }
+                });
             }
 
             function start_name() {
-                name = prompt('Entrez votre pseudo');
-                if (name) {
-                    NAME = name;
-                    init()
-                } else start_name()
+                bootbox.prompt("Enter an username", function(name) {
+                    if (name !== null) { 
+                        NAME = name;
+                        init();
+                    } else start_name();
+                });
             }
 
         </script>
     </head>
     <body onload='start_name()'>
         <div id="listChannelsDiv"><ul id="listChannels"></ul></div>
-        <div id="chat"><div id="chatContent"></div><input type="text" placeholder="Entrez un message" id="chatInput"/></div>
+        <div id="chat"><div id="chatContent"></div></div>
         
-        <div id="contextMenuUser">
+        <div id="contextMenu">
             <ul class="dropdown-menu" role="menu">
-                <li><a tabindex="-1">Private message</a></li>
-                <li><a tabindex="-1">Mute</a></li>
-            </ul>
-        </div>
-
-        <div id="contextMenuChannel">
-            <ul class="dropdown-menu" role="menu">
-                <li><a tabindex="-1">Join channel</a></li>
-                <li><a tabindex="-1">Edit name</a></li>
             </ul>
         </div>
 
