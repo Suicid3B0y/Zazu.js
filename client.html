@@ -18,6 +18,7 @@
             /** CONFIG **/
             var SIGNALING_SERVER = "";
             var USE_AUDIO = true;
+	    var MICROPHONE_OK = false;
             var MUTE_AUDIO_BY_DEFAULT = false;
             var CHANNELS = [];
             var NAMES = {};
@@ -93,19 +94,21 @@
                         $('#myInterface').append(local_media);
                         $('body').append('<br>Others :<br>');
                         attachMediaStream(local_media[0], stream);
-                        if (callback) callback();
+			MICROPHONE_OK = true;
+			if (callback) callback();
                     },
                     function() { /* user denied access to a/v */
-                        console.log("Access denied for audio/video");
-                        alert("You chose not to provide access to the camera/microphone, demo will not work.");
-                        if (errorback) errorback();
+			console.log("Access denied for audio/video");
+			$('body').append("Me : <br><div id='myInterface'><input type='button' id='changeNameButton' onclick='change_name()' value='Changer de nom'><br>");
+			$('body').append('<br>Others :<br>');		 
+                        if (callback) callback();
                     });
             }
 
             function init() {
                 console.log("Connecting to signaling server");
                 setup_local_media(function() {
-                    signaling_socket = io.connect(SIGNALING_SERVER, {query:"name="+NAME});
+                    signaling_socket = io.connect(SIGNALING_SERVER, {query:"name="+NAME+"&microphone_ok="+MICROPHONE_OK});
                     signaling_socket.on('connect', function() {
                         console.log("Connected to signaling server");
                     });
