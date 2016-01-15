@@ -5,12 +5,7 @@
         <script src="http://underscorejs.org/underscore.js"></script>
         <script src="http://sugarjs.com/release/current/sugar.min.js"></script>
         <script src="adapter.js"></script>
-        <style>
-            html, body { 
-                background-color: #555; 
-            }
-        </style>
-
+        
         <link rel="stylesheet" type="text/css" href="bootstrap.css"/>
         
         <script src="/socket.io/socket.io.js"></script>
@@ -369,7 +364,8 @@
         </script>
     </head>
     <body onload='start_name()'>
-        <div id="listChannelsDiv"><ul id="listChannels"></ul></div>
+    <div class="container">
+    <div id="listChannelsDiv"><ul id="listChannels"></ul></div>
         <div id="chat"><div id="chatContent"></div><input type="text" placeholder="Entrez un message" id="chatInput"/></div>
 
         <script>
@@ -380,5 +376,6 @@
                 }
             });
         </script>
+    </div>
     </body>
 </html>
