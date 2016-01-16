@@ -27,6 +27,7 @@
         var MUTE_AUDIO_BY_DEFAULT = false;
         var CHANNELS = [];
         var NAMES = {};
+        var MUTED = [];
         var rightClick = null;
         var NAME = "Noob user";
         var ICE_SERVERS = [
@@ -133,9 +134,10 @@
 
             for (var i = 0; i < menu.length; i++) {
                 if (isJSON(menu[i])) {
-                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-right'></span>" + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
+                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-right'></span> " + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
                     for (var j = 0; j < menu[i].sockets.length; j++) {
-                        add += "<li data-id-user='" + menu[i].sockets[j] + "'>" + NAMES[menu[i].sockets[j]] + "</li>";
+                        var glyph = (MUTED.includes(menu[i].sockets[j])) ? "glyphicon-volume-off" : "glyphicon-volume-up";
+                        add += "<li data-id-user='" + menu[i].sockets[j] + "'><span class='glyphicon "+glyph+"'></span> " + NAMES[menu[i].sockets[j]] + "</li>";
                     }
                     add += "</ul></li>";
                     if (menu[i].father !== null)
@@ -148,16 +150,29 @@
             ;
 
             $('#listChannels').find('li[data-id-user]')
-                    .on('click', function (e, context) {
+                    .on('click', function (e) {
                         idUser = $(this).data().idUser;
                         console.log('Left click on ' + NAMES[idUser]);
 
+                    })
+                    .on('dblclick', function (e) {
+                        idUser = $(this).data().idUser;
+                        bootbox.prompt("Enter a message for " + NAMES[idUser], function (msg) {
+                            if (msg !== null) {
+                                signaling_socket.emit("msgSent", {
+                                    code: "private",
+                                    receiver_id: idUser,
+                                    content: msg
+                                });
+                            }
+                        });
                     })
                     .contextmenu({
                         target: '#contextMenu',
                         before: function (e, context) {
                             rightClick = context;
-                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Private message</a></li><li><a tabindex="-1">Mute</a></li>';
+                            var strMute = (MUTED.includes(rightClick.data().idUser)) ? "Unmute" : "Mute";
+                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Private message</a></li><li><a tabindex="-1">'+strMute+'</a></li>';
                         },
                         onItem: function (context, e) {
                             idUser = rightClick.data().idUser;
@@ -175,14 +190,26 @@
                                     });
                                     break;
                                 case "Mute":
+                                    console.log('TODO : real mute');
+                                    MUTED.add(idUser);
+                                    $('li[data-id-user="'+idUser+'"] > span.glyphicon').removeClass('glyphicon-volume-up').addClass('glyphicon-volume-off')
+                                    break;
+                                case "Unmute":
+                                    console.log('TODO : real unmute');
+                                    MUTED.remove(idUser);
+                                    $('li[data-id-user="'+idUser+'"] > span.glyphicon').removeClass('glyphicon-volume-off').addClass('glyphicon-volume-up')
                                     break;
                             }
                         }
                     });
 
             $('#listChannels').find('div[data-id-channel]')
-                    .on('click', function (e, context) {
+                    .on('click', function (e) {
                         console.log('Left click on ' + $(this).text());
+                    })
+                    .on('dblclick', function (e) {
+                        channel = $(this).data().idChannel;
+                        join_chat_channel(channel);
                     })
                     .contextmenu({
                         target: '#contextMenu',
@@ -198,8 +225,14 @@
                                     join_chat_channel(channel);
                                     break;
                                 case "Edit name":
-                                    name = prompt("Enter a new name for channel '" + rightClick.text() + "'");
-                                    signaling_socket.emit('editNameChannel', {id: channel, name: name});
+                                    bootbox.prompt("Enter a new name for channel '" + rightClick.text() + "'", function (name) {
+                                        if (name !== null) {
+                                            signaling_socket.emit('editNameChannel', {
+                                                id: channel, 
+                                                name: name
+                                            });
+                                        }
+                                    });
                                     break;
                             }
                         }

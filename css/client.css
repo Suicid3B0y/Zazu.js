@@ -9,6 +9,12 @@
     overflow: auto;
 }
 
+#listChannelsDiv ul {
+	list-style: none;
+    margin-left: -14px;
+}
+
 .ui-button {
     margin: 5px;
 }
+
