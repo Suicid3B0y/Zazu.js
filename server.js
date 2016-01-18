@@ -7,7 +7,22 @@ var main = express()
 var server = http.createServer(main)
 var io = require('socket.io').listen(server);
 var fs = require('fs');
-var listChannels = require('./serverRooms.json');
+
+function fileExists(filePath) {
+    try {
+        return fs.statSync(filePath).isFile();
+    } catch (err) {
+        return false;
+    }
+}
+
+var listChannels = null;
+if (fileExists('./serverRooms.json')) {
+    listChannels = require('./serverRooms.json');
+} else {
+    listChannels = require('./defaultRooms.json');
+}
+
 console.log(listChannels);
 var DEFAULT_CHANNEL = listChannels[0].id;
 server.listen(PORT, null, function () {
@@ -81,6 +96,17 @@ io.sockets.on('connection', function (socket) {
             return res;
         }
 
+    }
+
+    function saveRoomsToJson() {
+        var outputJson = "serverRooms.json";
+        fs.writeFile(outputJson, printChannels(channels), function(err) {
+            if(err) {
+              console.log(err);
+            } else {
+              console.log("JSON saved to " + outputJson);
+            }
+        });
     }
 
     function getTimestamp() {
@@ -218,14 +244,15 @@ io.sockets.on('connection', function (socket) {
         console.log("[" + socket.id + "] change name of channel of id '" + channel.id + "' from '" + channels[channel.id].name + "'' to '" + channel.name + "'");
         channels[channel.id].name = channel.name;
 
-        var outputJson = "serverRooms.json";
-        fs.writeFile(outputJson, printChannels(channels), function(err) {
-            if(err) {
-              console.log(err);
-            } else {
-              console.log("JSON saved to " + outputJson);
-            }
-        }); 
+        saveRoomsToJson(); 
+    });
+
+    socket.on('addChannel', function(channel) {
+        console.log("[" + socket.id + "] add a channel '" + channel.name + "' in channel '" + channels[channel.father].name + "'");
+        newChannelId = channels.max(function(n) { return n.id }).id+1;
+        channels.add({"id":newChannelId,"name":channel.name,"sockets":[],"father":channel.father});
+
+        saveRoomsToJson();
     });
 
     socket.on('getListChannelsAndNames', function () {

@@ -235,7 +235,11 @@
                         target: '#contextMenu',
                         before: function (e, context) {
                             rightClick = context;
-                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Join channel</a></li><li><a tabindex="-1">Message to channel</a><a tabindex="-1">Edit name</a></li>';
+                            $('#contextMenu > ul').get(0).innerHTML = 
+                                '<li><a tabindex="-1">Join channel</a></li>'+
+                                '<li><a tabindex="-1">Message to channel</a></li>'+
+                                '<li><a tabindex="-1">Edit name</a></li>'+
+                                '<li><a tabindex="-1">Add a channel</a></li>';
                         },
                         onItem: function (context, e) {
                             channel = rightClick.data().idChannel;
@@ -261,6 +265,16 @@
                                             signaling_socket.emit('editNameChannel', {
                                                 id: channel, 
                                                 name: name
+                                            });
+                                        }
+                                    });
+                                    break;
+                                case "Add a channel":
+                                    bootbox.prompt("Enter a name for the new channel", function (name) {
+                                        if (name !== null) {
+                                            signaling_socket.emit('addChannel', {
+                                                name: name, 
+                                                father: channel
                                             });
                                         }
                                     });
