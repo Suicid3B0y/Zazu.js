@@ -133,13 +133,25 @@
 
         /** Menu creation **/
 
+        function collapsing(channel) {
+            if ($(channel).hasClass('glyphicon-triangle-right')) {
+                $(channel).removeClass('glyphicon-triangle-right').addClass('glyphicon-triangle-bottom');
+                $(channel.parentNode.nextSibling).css({height:'auto', overflow:'hidden'});
+            } else if ($(channel).hasClass('glyphicon-triangle-bottom')) {
+                $(channel).removeClass('glyphicon-triangle-bottom').addClass('glyphicon-triangle-right'); 
+                $(channel.parentNode.nextSibling).css({height:'0px', overflow:'auto'});
+            } else {
+                console.log('ERROR: incorrect call to collapsing with : ', channel); 
+            }
+        }
+
         function create_menu(menu) {
 
             res = $("#listChannels");
 
             for (var i = 0; i < menu.length; i++) {
                 if (isJSON(menu[i])) {
-                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-right'></span> " + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
+                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-bottom'></span> " + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
                     for (var j = 0; j < menu[i].sockets.length; j++) {
                         var glyph = (MUTED.includes(menu[i].sockets[j])) ? "glyphicon-volume-off" : "glyphicon-volume-up";
                         add += "<li data-id-user='" + menu[i].sockets[j] + "'><span class='glyphicon "+glyph+"'></span> " + NAMES[menu[i].sockets[j]] + "</li>";
@@ -153,6 +165,9 @@
                     console.log("Channels list not valid")
             }
             ;
+
+            // Used to do collapsing on each glyphicon triangle
+            $('#listChannels span.glyphicon').off("click").on("click", function(e) { collapsing(this); });
 
             $('#listChannels').find('li[data-id-user]')
                     .on('click', function (e) {
@@ -220,17 +235,28 @@
                         target: '#contextMenu',
                         before: function (e, context) {
                             rightClick = context;
-                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Join channel</a></li><li><a tabindex="-1">Edit name</a></li>';
+                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Join channel</a></li><li><a tabindex="-1">Message to channel</a><a tabindex="-1">Edit name</a></li>';
                         },
                         onItem: function (context, e) {
                             channel = rightClick.data().idChannel;
-                            console.log($(e.target).text() + " on channel '" + rightClick.text() + "'");
+                            console.log($(e.target).text() + " on channel '" + rightClick.text().trim() + "'");
                             switch ($(e.target).text()) {
                                 case "Join channel":
                                     join_chat_channel(channel);
                                     break;
+                                case "Message to channel":
+                                    bootbox.prompt("Enter a message for channel '" + rightClick.text().trim() + "'", function (msg) {
+                                        if (msg !== null) {
+                                            signaling_socket.emit("msgSent", {
+                                                code: "channelDistant",
+                                                id: channel,
+                                                content: msg
+                                            });
+                                        }
+                                    });
+                                    break;
                                 case "Edit name":
-                                    bootbox.prompt("Enter a new name for channel '" + rightClick.text() + "'", function (name) {
+                                    bootbox.prompt("Enter a new name for channel '" + rightClick.text().trim() + "'", function (name) {
                                         if (name !== null) {
                                             signaling_socket.emit('editNameChannel', {
                                                 id: channel, 
@@ -424,6 +450,9 @@
                             break;
                         case "channel":
                             chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] (Channel) <b>" + NAMES[msg.author_id] + "</b> : " + msg.content + "</span><br>");
+                            break;
+                        case "channelOut":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] To channel <b>" + CHANNELS.filter(function(channel) { return channel.id==msg.channel })[0].name + "</b> : " + msg.content + "</span><br>");
                             break;
                         case "privateIn":
                             chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] <b>" + NAMES[msg.author_id] + "</b> : " + msg.content + "</span><br>");
