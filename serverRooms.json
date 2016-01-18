@@ -1,8 +1,0 @@
-[{"id":0, "name":"Root", "sockets":[], "father":null},
-{"id":1, "name":"Room 1", "sockets":[], "father":0},
-{"id":2, "name":"Room 2", "sockets":[], "father":1},
-{"id":3, "name":"Room 3", "sockets":[], "father":2},
-{"id":4, "name":"Room 4", "sockets":[], "father":3},
-{"id":5, "name":"Room 5", "sockets":[], "father":3},
-{"id":6, "name":"Room 6", "sockets":[], "father":1}
-]
