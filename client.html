@@ -27,12 +27,14 @@
         var MUTE_AUDIO_BY_DEFAULT = false;
         var CHANNELS = [];
         var NAMES = {};
+        var MUTED = [];
         var rightClick = null;
         var NAME = "Noob user";
         var ICE_SERVERS = [
             {url: "stun:stun.l.google.com:19302"}
         ];
-        var CHAT_AUTOSCROLL = true; /* Chat is autoscrolling by default */
+        var CHAT_AUTOSCROLL = true;
+        /* Chat is autoscrolling by default */
 
         var signaling_socket = null;
         /* our socket.io connection to our webserver */
@@ -117,9 +119,13 @@
             var autoscrollChatIconElement = $('#autoscroll-chat-icon');
             CHAT_AUTOSCROLL = !CHAT_AUTOSCROLL;
             if (CHAT_AUTOSCROLL) {
-                autoscrollChatElement.attr("data-content", "Disable Auto-scroll in chat");
+                autoscrollChatElement.attr("title", "Disable Auto-scroll in chat")
+                        .tooltip('fixTitle')
+                        .tooltip('show');
             } else {
-                autoscrollChatElement.attr("data-content", "Enable Auto-scroll in chat");
+                autoscrollChatElement.attr("title", "Enable Auto-scroll in chat")
+                        .tooltip('fixTitle')
+                        .tooltip('show');
             }
             autoscrollChatIconElement.toggleClass("fa-play");
             autoscrollChatIconElement.toggleClass("fa-pause");
@@ -127,15 +133,28 @@
 
         /** Menu creation **/
 
+        function collapsing(channel) {
+            if ($(channel).hasClass('glyphicon-triangle-right')) {
+                $(channel).removeClass('glyphicon-triangle-right').addClass('glyphicon-triangle-bottom');
+                $(channel.parentNode.nextSibling).css({height:'auto', overflow:'hidden'});
+            } else if ($(channel).hasClass('glyphicon-triangle-bottom')) {
+                $(channel).removeClass('glyphicon-triangle-bottom').addClass('glyphicon-triangle-right'); 
+                $(channel.parentNode.nextSibling).css({height:'0px', overflow:'auto'});
+            } else {
+                console.log('ERROR: incorrect call to collapsing with : ', channel); 
+            }
+        }
+
         function create_menu(menu) {
 
             res = $("#listChannels");
 
             for (var i = 0; i < menu.length; i++) {
                 if (isJSON(menu[i])) {
-                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-right'></span>" + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
+                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-bottom'></span> " + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
                     for (var j = 0; j < menu[i].sockets.length; j++) {
-                        add += "<li data-id-user='" + menu[i].sockets[j] + "'>" + NAMES[menu[i].sockets[j]] + "</li>";
+                        var glyph = (MUTED.includes(menu[i].sockets[j])) ? "glyphicon-volume-off" : "glyphicon-volume-up";
+                        add += "<li data-id-user='" + menu[i].sockets[j] + "'><span class='glyphicon "+glyph+"'></span> " + NAMES[menu[i].sockets[j]] + "</li>";
                     }
                     add += "</ul></li>";
                     if (menu[i].father !== null)
@@ -147,17 +166,33 @@
             }
             ;
 
+            // Used to do collapsing on each glyphicon triangle
+            $('#listChannels span.glyphicon').off("click").on("click", function(e) { collapsing(this); });
+
             $('#listChannels').find('li[data-id-user]')
-                    .on('click', function (e, context) {
+                    .on('click', function (e) {
                         idUser = $(this).data().idUser;
                         console.log('Left click on ' + NAMES[idUser]);
 
+                    })
+                    .on('dblclick', function (e) {
+                        idUser = $(this).data().idUser;
+                        bootbox.prompt("Enter a message for " + NAMES[idUser], function (msg) {
+                            if (msg !== null) {
+                                signaling_socket.emit("msgSent", {
+                                    code: "private",
+                                    receiver_id: idUser,
+                                    content: msg
+                                });
+                            }
+                        });
                     })
                     .contextmenu({
                         target: '#contextMenu',
                         before: function (e, context) {
                             rightClick = context;
-                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Private message</a></li><li><a tabindex="-1">Mute</a></li>';
+                            var strMute = (MUTED.includes(rightClick.data().idUser)) ? "Unmute" : "Mute";
+                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Private message</a></li><li><a tabindex="-1">'+strMute+'</a></li>';
                         },
                         onItem: function (context, e) {
                             idUser = rightClick.data().idUser;
@@ -175,31 +210,74 @@
                                     });
                                     break;
                                 case "Mute":
+                                    console.log('TODO : real mute');
+                                    MUTED.add(idUser);
+                                    $('li[data-id-user="'+idUser+'"] > span.glyphicon').removeClass('glyphicon-volume-up').addClass('glyphicon-volume-off')
+                                    break;
+                                case "Unmute":
+                                    console.log('TODO : real unmute');
+                                    MUTED.remove(idUser);
+                                    $('li[data-id-user="'+idUser+'"] > span.glyphicon').removeClass('glyphicon-volume-off').addClass('glyphicon-volume-up')
                                     break;
                             }
                         }
                     });
 
             $('#listChannels').find('div[data-id-channel]')
-                    .on('click', function (e, context) {
+                    .on('click', function (e) {
                         console.log('Left click on ' + $(this).text());
+                    })
+                    .on('dblclick', function (e) {
+                        channel = $(this).data().idChannel;
+                        join_chat_channel(channel);
                     })
                     .contextmenu({
                         target: '#contextMenu',
                         before: function (e, context) {
                             rightClick = context;
-                            $('#contextMenu > ul').get(0).innerHTML = '<li><a tabindex="-1">Join channel</a></li><li><a tabindex="-1">Edit name</a></li>';
+                            $('#contextMenu > ul').get(0).innerHTML = 
+                                '<li><a tabindex="-1">Join channel</a></li>'+
+                                '<li><a tabindex="-1">Message to channel</a></li>'+
+                                '<li><a tabindex="-1">Edit name</a></li>'+
+                                '<li><a tabindex="-1">Add a channel</a></li>';
                         },
                         onItem: function (context, e) {
                             channel = rightClick.data().idChannel;
-                            console.log($(e.target).text() + " on channel '" + rightClick.text() + "'");
+                            console.log($(e.target).text() + " on channel '" + rightClick.text().trim() + "'");
                             switch ($(e.target).text()) {
                                 case "Join channel":
                                     join_chat_channel(channel);
                                     break;
+                                case "Message to channel":
+                                    bootbox.prompt("Enter a message for channel '" + rightClick.text().trim() + "'", function (msg) {
+                                        if (msg !== null) {
+                                            signaling_socket.emit("msgSent", {
+                                                code: "channelDistant",
+                                                id: channel,
+                                                content: msg
+                                            });
+                                        }
+                                    });
+                                    break;
                                 case "Edit name":
-                                    name = prompt("Enter a new name for channel '" + rightClick.text() + "'");
-                                    signaling_socket.emit('editNameChannel', {id: channel, name: name});
+                                    bootbox.prompt("Enter a new name for channel '" + rightClick.text().trim() + "'", function (name) {
+                                        if (name !== null) {
+                                            signaling_socket.emit('editNameChannel', {
+                                                id: channel, 
+                                                name: name
+                                            });
+                                        }
+                                    });
+                                    break;
+                                case "Add a channel":
+                                    bootbox.prompt("Enter a name for the new channel", function (name) {
+                                        if (name !== null) {
+                                            signaling_socket.emit('addChannel', {
+                                                name: name, 
+                                                father: channel
+                                            });
+                                        }
+                                    });
                                     break;
                             }
                         }
@@ -220,31 +298,38 @@
                     function (stream) { /* user accepted access to a/v */
                         console.log("Access granted to audio/video");
                         local_media_stream = stream;
-                        var local_media = $("<audio>");
+                        var local_media = $("<audio style='display: none'>");
                         local_media.attr("autoplay", "autoplay");
                         local_media.attr("controls", "");
                         local_media.attr('id', "myAudio");
                         var controlPanelElement = $('#control-panel');
-                        controlPanelElement.append("<div><b>Options :<b><br></div>"
-                                + "<div id='myInterface'>"
+                        controlPanelElement.append("<div><h5>Your settings</h5></div>"
+                                + "<div id='self-panel-container'>"
                                 + "<div id='self-mute-microphone-container' style='display: inline' rel='microphone-container' onclick='toggle_my_stream()'>"
-                                + "<a id='self-mute-microphone-button' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Mute your microphone' data-placement='bottom' data-trigger='hover'>"
+                                + "<a id='self-mute-microphone-button' class='btn btn-sm ui-button' href='#' title='Mute your microphone' data-placement='bottom' data-toggle='tooltip'>"
                                 + "<i id='self-mute-microphone-icon' class='fa fa-microphone'></i>"
                                 + "</a>"
                                 + "</div>"
-                                + "<input type='button' id='changeNameButton' class='btn btn-sm' onclick='change_username()' value='Change username'>"
+                                + "<input type='button' id='changeNameButton' class='btn btn-sm btn-primary' onclick='change_username()' value='Change username'>"
                                 + "<br>");
-                        $('a[rel="popover"]').popover();
-                        $('#myInterface').append(local_media);
-                        controlPanelElement.append('<div><b>Channel user volumes :<b><br></div>');
+                        $('#self-panel-container').find('[data-toggle="tooltip"]').tooltip();
+                        $('#self-panel-container').append(local_media);
+                        $('#self-panel-container').find('audio').get(0).volume = 0; // Self audio muted by default
+                        controlPanelElement.append('<div><h5>Channel users</h5></div>');
                         attachMediaStream(local_media[0], stream);
                         MICROPHONE_OK = true;
                         if (callback) callback();
                     },
                     function () { /* user denied access to a/v */
                         console.log("Access denied for audio/video");
-                        $('body').append("Me : <br><div id='myInterface'><input type='button' id='changeNameButton' onclick='change_username()' value='Changer de nom'><br>");
-                        $('body').append('<br>Others :<br>');
+                        var controlPanelElement = $('#control-panel');
+                        controlPanelElement.append("<div>" +
+                                "<h5>Your settings</h5>" +
+                                "</div>"
+                                + "<div id='self-panel-container'>"
+                                + "<input type='button' id='changeNameButton' class='btn btn-sm btn-primary' onclick='change_username()' value='Change username'>"
+                                + "<br>");
+                        controlPanelElement.append('<div><h5>Channel users</h5><br></div>');
                         if (callback) callback();
                     });
         }
@@ -252,23 +337,56 @@
         function toggle_my_stream() {
             var audioTracks = local_media_stream.getAudioTracks();
             var iconElement = $('#self-mute-microphone-icon');
-            var popoverElement = $('#self-mute-microphone-button');
+            var buttonElement = $('#self-mute-microphone-button');
             if (audioTracks[0]) {
                 if (audioTracks[0].enabled == true) {
                     audioTracks[0].enabled = false;
-                    $(popoverElement).attr('data-content', 'Unmute your microphone');
+                    $(buttonElement).attr("title", "Unmute your microphone")
+                            .tooltip('fixTitle')
+                            .tooltip('show');
                     signaling_socket.emit('muted')
                 }
                 else {
                     audioTracks[0].enabled = true;
-                    $(popoverElement).attr('data-content', 'Mute your microphone');
+                    $(buttonElement).attr("title", "Mute your microphone")
+                            .tooltip('fixTitle')
+                            .tooltip('show');
                     signaling_socket.emit('unmuted')
                 }
 
                 $(iconElement).toggleClass('fa-microphone');
                 $(iconElement).toggleClass('fa-microphone-slash');
-                $(popoverElement).toggleClass('btn-warning');
+                $(buttonElement).toggleClass('btn-warning');
             }
+        }
+
+        function set_user_volume(range_element) {
+            var peer_id = $(range_element).attr("data-peer-id");
+            var volume_value = range_element.value;
+            var mediaElement = peer_media_elements[peer_id];
+            var audioElement = $(mediaElement).find('audio').get(0);
+            audioElement.volume = volume_value;
+        }
+
+        function toggle_user_stream(source_element) {
+            var peer_id = $(source_element).attr("data-peer-id");
+            var mediaElement = peer_media_elements[peer_id];
+            var audioElement = $(mediaElement).find('audio').get(0);
+            var buttonElement = $(mediaElement).find('.remote-user-mute-button').get(0);
+            var iconElement = $(mediaElement).find('.remote-user-mute-icon').get(0);
+            audioElement.muted = !audioElement.muted;
+            if (audioElement.muted) {
+                $(buttonElement).attr("title", "Unmute " + NAMES[peer_id])
+                        .tooltip('fixTitle')
+                        .tooltip('show');
+            } else {
+                $(buttonElement).attr("title", "Mute " + NAMES[peer_id])
+                        .tooltip('fixTitle')
+                        .tooltip('show');
+            }
+            $(iconElement).toggleClass('fa-volume-up');
+            $(iconElement).toggleClass('fa-volume-off');
+            $(buttonElement).toggleClass('btn-danger');
         }
 
         /** Listeners initialization on socket **/
@@ -284,11 +402,13 @@
                     console.log("Connected to signaling server");
                     $('#chat').append("<input type='text' placeholder='Entrez un message' id='chatInput'/>" +
                             "<div id='autoscroll-chat-container' style='display: inline' onclick='toggle_autoscroll()'>"
-                            + "<a id='autoscroll-chat' class='btn btn-sm ui-button' href='#' rel='popover' data-content='Enable Auto-scroll in chat' data-placement='bottom' data-trigger='hover'>"
+                            + "<a id='autoscroll-chat' class='btn btn-sm ui-button' href='#' title='Disable Auto-scroll in chat' data-placement='bottom' data-toggle='tooltip'>"
                             + "<i id='autoscroll-chat-icon' class='fa fa-pause'></i>"
                             + "</a>"
                             + "</div>");
                     add_chat_listener();
+                    $('#chat').find('[data-toggle="tooltip"]').tooltip();
+
                 });
 
                 signaling_socket.on('disconnect', function () {
@@ -345,6 +465,9 @@
                         case "channel":
                             chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] (Channel) <b>" + NAMES[msg.author_id] + "</b> : " + msg.content + "</span><br>");
                             break;
+                        case "channelOut":
+                            chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] To channel <b>" + CHANNELS.filter(function(channel) { return channel.id==msg.channel })[0].name + "</b> : " + msg.content + "</span><br>");
+                            break;
                         case "privateIn":
                             chatContentElement.append("<span>[" + timestamp_to_time(msg.date) + "] <b>" + NAMES[msg.author_id] + "</b> : " + msg.content + "</span><br>");
                             break;
@@ -361,7 +484,13 @@
                 });
 
                 signaling_socket.on('muted', function (peer) {
-                    $('#' + peer.peer_id.from(2)).prepend('<span class="muted">Muted</span>');
+                    $('#' + peer.peer_id.from(2)).find('.user-controls-container').prepend("<div class='remote-user-is-muted-container muted' style='display: inline' data-peer-id='" + peer.peer_id + "'>"
+                            + "<button class='btn btn-sm btn-info ui-button remote-user-is-muted-button disabled' href='#' title='" + NAMES[peer.peer_id] + " is self-muted' data-placement='bottom' data-toggle='tooltip'>"
+                                // TODO : attention ici le nom ne sera pas changer en cas de rename !
+                            + "<i class='fa fa-microphone-slash remote-user-is-muted-icon'></i>"
+                            + "</button>"
+                            + "</div>");
+                    $('#' + peer.peer_id.from(2)).find('.user-controls-container').find('[data-toggle="tooltip"]').tooltip();
                 })
 
                 signaling_socket.on('unmuted', function (peer) {
@@ -413,7 +542,7 @@
                     }
                     peer_connection.onaddstream = function (event) {
                         console.log("onAddStream", event);
-                        var remote_media = $("<audio>");
+                        var remote_media = $("<audio style='display: none'>");
                         remote_media.attr("autoplay", "autoplay");
                         if (MUTE_AUDIO_BY_DEFAULT) {
                             remote_media.attr("muted", "true");
@@ -423,6 +552,18 @@
                         console.log(peer_id.from(2));
                         $('#control-panel').append('<div id="' + peer_id.from(2) + '"></div>');
                         $('#' + peer_id.from(2)).append(remote_media);
+                        // TODO : attention ici le nom ne sera pas changer en cas de rename !
+                        $('#' + peer_id.from(2)).append("<div class='user-panel-container'><b>" + NAMES[peer_id] + "</b> :<br>");
+                        $('#' + peer_id.from(2)).append("<div class='user-controls-container'>"
+                                + "<div class='remote-user-mute-container' style='display: inline' onclick='toggle_user_stream(this)' data-peer-id='" + peer_id + "'>"
+                                + "<a class='btn btn-sm ui-button remote-user-mute-button' href='#' data-toggle='tooltip' title='Mute " + NAMES[peer_id] + "' data-placement='bottom'>"
+                                + "<i class='fa fa-volume-up remote-user-mute-icon'></i>"
+                                + "</a>"
+                                + "</div>"
+                                + "<div class='user-volume-range-container' style='display: inline-block; top: 6px;position: relative;'><input class='custom-range' type='range' min='0' max='1' step='0.01' value='1' oninput='set_user_volume(this)' onchange='set_user_volume(this)' data-peer-id='" + peer_id + "'></div>"
+                                + "</div></div>");
+
+                        $('#' + peer_id.from(2)).find('[data-toggle="tooltip"]').tooltip();
 
                         peer_media_elements[peer_id] = $('#' + peer_id.from(2));
                         attachMediaStream(remote_media[0], event.stream);

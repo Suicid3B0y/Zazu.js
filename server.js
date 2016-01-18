@@ -6,7 +6,23 @@ var sugar = require('sugar');
 var main = express()
 var server = http.createServer(main)
 var io = require('socket.io').listen(server);
-var listChannels = require('./serverRooms.json');
+var fs = require('fs');
+
+function fileExists(filePath) {
+    try {
+        return fs.statSync(filePath).isFile();
+    } catch (err) {
+        return false;
+    }
+}
+
+var listChannels = null;
+if (fileExists('./serverRooms.json')) {
+    listChannels = require('./serverRooms.json');
+} else {
+    listChannels = require('./defaultRooms.json');
+}
+
 console.log(listChannels);
 var DEFAULT_CHANNEL = listChannels[0].id;
 server.listen(PORT, null, function () {
@@ -62,6 +78,36 @@ io.sockets.on('connection', function (socket) {
         sockets[id].emit("msgReceived", {code: "connect", author_id: socket.id, date: getTimestamp()})
     }
 
+    function printChannels(channels) {
+        var res = "";
+        if (Array.isArray(channels)) {
+            res += "[\n";
+            for (var i = 0; i < channels.length; i++) {
+                var tmp = Object.extended(channels[i]).clone(); // Obligé pour ne pas modifier le channel.sockets original
+                tmp.sockets = [];
+                if (i != channels.length-1) res += JSON.stringify(tmp)+",\n";
+                else res += JSON.stringify(tmp)+"\n";
+            }
+            res += "]";
+            return res;
+        } else {
+            res = "Error on argument channels :";
+            res += channels.toString();
+            return res;
+        }
+
+    }
+
+    function saveRoomsToJson() {
+        var outputJson = "serverRooms.json";
+        fs.writeFile(outputJson, printChannels(channels), function(err) {
+            if(err) {
+              console.log(err);
+            } else {
+              console.log("JSON saved to " + outputJson);
+            }
+        });
+    }
 
     function getTimestamp() {
         return parseInt(Date.now() / 1000, 10);
@@ -153,6 +199,25 @@ io.sockets.on('connection', function (socket) {
                     })
                 }
                 break;
+            case "channelDistant":
+                console.log("[" + socket.id + "] send '" + encodeURI(msg.content) + "' to '" + channels[msg.id].name + "'");
+                for (id in channels[msg.id].sockets) {
+                    sockets[channels[msg.id].sockets[id]].emit('msgReceived', {
+                        'code': 'channel',
+                        'content': msg.content,
+                        'author_id': socket.id,
+                        'date': getTimestamp()
+                    });
+                }
+                if (channels[msg.id].sockets.indexOf(socket.id) == -1) {
+                    socket.emit('msgReceived', {
+                        'code': 'channelOut',
+                        'content': msg.content,
+                        'channel': msg.id,
+                        'date': getTimestamp()
+                    })
+                }
+                break;
             case "private":
                 console.log("[" + socket.id + "] send '" + encodeURI(msg.content) + "' to [" + msg.receiver_id + "]");
                 if (sockets[msg.receiver_id]) {
@@ -178,6 +243,16 @@ io.sockets.on('connection', function (socket) {
     socket.on('editNameChannel', function (channel) {
         console.log("[" + socket.id + "] change name of channel of id '" + channel.id + "' from '" + channels[channel.id].name + "'' to '" + channel.name + "'");
         channels[channel.id].name = channel.name;
+
+        saveRoomsToJson(); 
+    });
+
+    socket.on('addChannel', function(channel) {
+        console.log("[" + socket.id + "] add a channel '" + channel.name + "' in channel '" + channels[channel.father].name + "'");
+        newChannelId = channels.max(function(n) { return n.id }).id+1;
+        channels.add({"id":newChannelId,"name":channel.name,"sockets":[],"father":channel.father});
+
+        saveRoomsToJson();
     });
 
     socket.on('getListChannelsAndNames', function () {
