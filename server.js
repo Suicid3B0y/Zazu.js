@@ -59,6 +59,9 @@ main.get('/index.html', function (req, res) {
 main.get('/client.html', function (req, res) {
     res.sendFile('client.html', options);
 });
+main.get('/logo.html', function (req, res) {
+    res.sendFile('logo.html', options);
+});
 
 var channels = listChannels;
 var sockets = {};
@@ -272,6 +275,18 @@ io.sockets.on('connection', function (socket) {
     socket.on('unmuted', function () {
         for (peer in sockets) {
             sockets[peer].emit('unmuted', {'peer_id': socket.id});
+        }
+    })
+
+    socket.on('deafen', function() {
+        for (peer in sockets) {
+            sockets[peer].emit('deafen', {'peer_id': socket.id});
+        }
+    })
+
+    soccket.on('undeafen', function() {
+        for (peer in sockets) {
+            sockets[peer].emit('undeafen', {'peer_id': socket.id});
         }
     })
 
