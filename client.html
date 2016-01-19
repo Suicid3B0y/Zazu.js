@@ -69,15 +69,29 @@
             return hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
         }
 
+        function urlParam(name) {
+            var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+            if (results==null) {
+                return null;
+            } else {
+                return results[1] || 0;
+            }
+        }
+
         /** Username actions **/
 
         function ask_username() {
-            bootbox.prompt("Enter an username", function (name) {
-                if (name !== null) {
-                    NAME = name;
-                    init();
-                } else ask_username();
-            });
+            if (urlParam('username') !== null) {
+                NAME = urlParam('username');
+                init();
+            } else {
+                bootbox.prompt("Enter an username", function (name) {
+                    if (name !== null) {
+                        NAME = name;
+                        init();
+                    } else ask_username();
+                });
+            }
         }
 
         function change_username() {
@@ -408,7 +422,9 @@
                             + "</div>");
                     add_chat_listener();
                     $('#chat').find('[data-toggle="tooltip"]').tooltip();
-
+                    if (urlParam('room') !== null) {
+                        join_chat_channel(urlParam('room'));
+                    }
                 });
 
                 signaling_socket.on('disconnect', function () {
@@ -496,6 +512,14 @@
                 signaling_socket.on('unmuted', function (peer) {
                     $('#' + peer.peer_id.from(2)).find('.muted').remove();
                 })
+
+                signaling_socket.on('deafen', function(peer) {
+                    // TODO : il se rend sourd
+                })
+
+                signaling_socket.on('undeafen', function(peer) {
+                    // TODO : il enlève le sourd
+                });
 
                 signaling_socket.on('listNames', function (names) {
                     if (!_.isEqual(names, NAMES)) {
