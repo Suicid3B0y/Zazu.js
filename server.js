@@ -284,7 +284,7 @@ io.sockets.on('connection', function (socket) {
         }
     })
 
-    soccket.on('undeafen', function() {
+    socket.on('undeafen', function() {
         for (peer in sockets) {
             sockets[peer].emit('undeafen', {'peer_id': socket.id});
         }
