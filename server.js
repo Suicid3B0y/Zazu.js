@@ -59,6 +59,9 @@ main.get('/index.html', function (req, res) {
 main.get('/client.html', function (req, res) {
     res.sendFile('client.html', options);
 });
+main.get('/logo.html', function (req, res) {
+    res.sendFile('logo.html', options);
+});
 
 var channels = listChannels;
 var sockets = {};
@@ -109,6 +112,18 @@ io.sockets.on('connection', function (socket) {
         });
     }
 
+    function replaceURL(text) {
+        var exp = /(\b(https?):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
+        return text.replace(exp,"<a href='$1'>$1</a>"); 
+    }
+
+    function outputText(text) {
+        return replaceURL(text.replace(/</g, '&lt;').
+        replace(/>/g, '&gt;').
+        replace(/"/g, '&quot;').
+        replace(/'/g, '&#039;'));
+    }
+
     function getTimestamp() {
         return parseInt(Date.now() / 1000, 10);
     }
@@ -123,8 +138,8 @@ io.sockets.on('connection', function (socket) {
     });
 
     socket.on('changeName', function (name) {
-        socket.name = name;
-        names[socket.id] = name;
+        socket.name = outputText(name);
+        names[socket.id] = outputText(name);
     })
 
 
@@ -193,7 +208,7 @@ io.sockets.on('connection', function (socket) {
                 for (id in channels[socket.channel].sockets) {
                     sockets[channels[socket.channel].sockets[id]].emit('msgReceived', {
                         'code': 'channel',
-                        'content': msg.content,
+                        'content': outputText(msg.content),
                         'author_id': socket.id,
                         'date': getTimestamp()
                     })
@@ -204,7 +219,7 @@ io.sockets.on('connection', function (socket) {
                 for (id in channels[msg.id].sockets) {
                     sockets[channels[msg.id].sockets[id]].emit('msgReceived', {
                         'code': 'channel',
-                        'content': msg.content,
+                        'content': outputText(msg.content),
                         'author_id': socket.id,
                         'date': getTimestamp()
                     });
@@ -212,7 +227,7 @@ io.sockets.on('connection', function (socket) {
                 if (channels[msg.id].sockets.indexOf(socket.id) == -1) {
                     socket.emit('msgReceived', {
                         'code': 'channelOut',
-                        'content': msg.content,
+                        'content': outputText(msg.content),
                         'channel': msg.id,
                         'date': getTimestamp()
                     })
@@ -223,13 +238,13 @@ io.sockets.on('connection', function (socket) {
                 if (sockets[msg.receiver_id]) {
                     sockets[msg.receiver_id].emit('msgReceived', {
                         'code': 'privateIn',
-                        'content': msg.content,
+                        'content': outputText(msg.content),
                         'author_id': socket.id,
                         'date': getTimestamp()
                     });
                     socket.emit('msgReceived', {
                         'code': 'privateOut',
-                        'content': msg.content,
+                        'content': outputText(msg.content),
                         'receiver_id': msg.receiver_id,
                         'date': getTimestamp()
                     });
@@ -242,7 +257,7 @@ io.sockets.on('connection', function (socket) {
 
     socket.on('editNameChannel', function (channel) {
         console.log("[" + socket.id + "] change name of channel of id '" + channel.id + "' from '" + channels[channel.id].name + "'' to '" + channel.name + "'");
-        channels[channel.id].name = channel.name;
+        channels[channel.id].name = outputText(channel.name);
 
         saveRoomsToJson(); 
     });
@@ -250,7 +265,7 @@ io.sockets.on('connection', function (socket) {
     socket.on('addChannel', function(channel) {
         console.log("[" + socket.id + "] add a channel '" + channel.name + "' in channel '" + channels[channel.father].name + "'");
         newChannelId = channels.max(function(n) { return n.id }).id+1;
-        channels.add({"id":newChannelId,"name":channel.name,"sockets":[],"father":channel.father});
+        channels.add({"id":newChannelId,"name":outputText(channel.name),"sockets":[],"father":channel.father});
 
         saveRoomsToJson();
     });
@@ -272,6 +287,18 @@ io.sockets.on('connection', function (socket) {
     socket.on('unmuted', function () {
         for (peer in sockets) {
             sockets[peer].emit('unmuted', {'peer_id': socket.id});
+        }
+    })
+
+    socket.on('deafen', function() {
+        for (peer in sockets) {
+            sockets[peer].emit('deafen', {'peer_id': socket.id});
+        }
+    })
+
+    socket.on('undeafen', function() {
+        for (peer in sockets) {
+            sockets[peer].emit('undeafen', {'peer_id': socket.id});
         }
     })
 
