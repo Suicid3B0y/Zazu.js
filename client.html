@@ -69,15 +69,29 @@
             return hours + ':' + minutes.substr(-2) + ':' + seconds.substr(-2);
         }
 
+        function urlParam(name) {
+            var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+            if (results==null) {
+                return null;
+            } else {
+                return results[1] || 0;
+            }
+        }
+
         /** Username actions **/
 
         function ask_username() {
-            bootbox.prompt("Enter an username", function (name) {
-                if (name !== null) {
-                    NAME = name;
-                    init();
-                } else ask_username();
-            });
+            if (urlParam('username') !== null) {
+                NAME = urlParam('username');
+                init();
+            } else {
+                bootbox.prompt("Enter an username", function (name) {
+                    if (name !== null) {
+                        NAME = name;
+                        init();
+                    } else ask_username();
+                });
+            }
         }
 
         function change_username() {
@@ -238,7 +252,7 @@
                             $('#contextMenu > ul').get(0).innerHTML = 
                                 '<li><a tabindex="-1">Join channel</a></li>'+
                                 '<li><a tabindex="-1">Message to channel</a></li>'+
-                                '<li><a tabindex="-1">Edit name</a></li>'+
+                                '<li><a tabindex="-1">Edit channel</a></li>'+
                                 '<li><a tabindex="-1">Add a channel</a></li>';
                         },
                         onItem: function (context, e) {
@@ -259,15 +273,50 @@
                                         }
                                     });
                                     break;
-                                case "Edit name":
-                                    bootbox.prompt("Enter a new name for channel '" + rightClick.text().trim() + "'", function (name) {
-                                        if (name !== null) {
-                                            signaling_socket.emit('editNameChannel', {
-                                                id: channel, 
-                                                name: name
-                                            });
+                                case "Edit channel":
+                                    bootbox.dialog({
+                                            title: "Edit channel",
+                                            message: 
+                                                '<div class="row">  ' +
+                                                    '<div class="col-md-12"> ' +
+                                                        '<form class="form-horizontal" id="editChannel" onsubmit="return false;"> ' +
+                                                            '<div class="form-group"> ' +
+                                                                '<label class="col-md-2 control-label" for="nameInput">Name</label> ' +
+                                                                '<div class="col-md-10"> ' +
+                                                                    '<input name="nameInput" type="text" value="' +  rightClick.text().trim() + '" autocomplete="off" class="form-control input-md"> ' +
+                                                                '</div> ' +
+                                                            '</div> ' +
+                                                            '<div class="form-group"> ' +
+                                                                '<label class="col-md-2 control-label" for="descriptionTextarea">Description</label> ' +
+                                                                '<div class="col-md-10"> ' +
+                                                                    '<textarea name="descriptionTextarea" class="cool-md-10 form-control" rows="3"></textarea> ' +
+                                                                '</div> ' +
+                                                            '</div> ' +
+                                                        '</form> ' +
+                                                    '</div> ' +
+                                                '</div>',
+                                            buttons: {
+                                                cancel: {
+                                                    label: "Cancel",
+                                                    className: "btn-default",
+                                                },
+                                                success: {
+                                                    label: "OK",
+                                                    className: "btn-primary",
+                                                    callback: function () {
+                                                        var form = $('#editChannel');
+                                                        var name = form.find("input[name='nameInput']").val();
+                                                        if (name !== "") {
+                                                            signaling_socket.emit('editNameChannel', {
+                                                                id: channel, 
+                                                                name: name
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
-                                    });
+                                    );
                                     break;
                                 case "Add a channel":
                                     bootbox.prompt("Enter a name for the new channel", function (name) {
@@ -408,7 +457,9 @@
                             + "</div>");
                     add_chat_listener();
                     $('#chat').find('[data-toggle="tooltip"]').tooltip();
-
+                    if (urlParam('room') !== null) {
+                        join_chat_channel(urlParam('room'));
+                    }
                 });
 
                 signaling_socket.on('disconnect', function () {
@@ -496,6 +547,14 @@
                 signaling_socket.on('unmuted', function (peer) {
                     $('#' + peer.peer_id.from(2)).find('.muted').remove();
                 })
+
+                signaling_socket.on('deafen', function(peer) {
+                    // TODO : il se rend sourd
+                })
+
+                signaling_socket.on('undeafen', function(peer) {
+                    // TODO : il enlève le sourd
+                });
 
                 signaling_socket.on('listNames', function (names) {
                     if (!_.isEqual(names, NAMES)) {
