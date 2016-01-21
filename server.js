@@ -23,6 +23,33 @@ if (fileExists('./serverRooms.json')) {
     listChannels = require('./defaultRooms.json');
 }
 
+/** Database conf **/
+
+var dbFile = "zazu.db";
+var dbExists = fileExists(dbFile);
+
+if(!dbExists) {
+  console.log("Creating DB SQLite file.");
+  fs.openSync(dbFile, "w");
+}
+
+var sqlite3 = require("sqlite3").verbose();
+var db = new sqlite3.Database(dbFile);
+
+db.serialize(function() {
+    db.run("CREATE TABLE IF NOT EXISTS `users`("+
+        "`id` VARCHAR(40) NOT NULL PRIMARY KEY,"+
+        "`username` VARCHAR(40) NOT NULL,"+
+        "`password` VARCHAR(40) NOT NULL"+
+    ")");
+
+
+});
+
+db.close();
+
+/** Database conf **/
+
 console.log(listChannels);
 var DEFAULT_CHANNEL = listChannels[0].id;
 server.listen(PORT, null, function () {
@@ -74,7 +101,7 @@ io.sockets.on('connection', function (socket) {
     sockets[socket.id] = socket;
     console.log("[" + socket.id + "] connection accepted");
 
-    names[socket.id] = socket.name;
+    names[socket.id] = outputText(socket.name.stripTags());
 
     for (id in sockets) {
         sockets[id].emit('listNames', names);
@@ -87,6 +114,7 @@ io.sockets.on('connection', function (socket) {
             res += "[\n";
             for (var i = 0; i < channels.length; i++) {
                 var tmp = Object.extended(channels[i]).clone(); // Obligé pour ne pas modifier le channel.sockets original
+                tmp = Object.select(tmp, ['id', 'name', 'description', 'father']);
                 tmp.sockets = [];
                 if (i != channels.length-1) res += JSON.stringify(tmp)+",\n";
                 else res += JSON.stringify(tmp)+"\n";
@@ -138,8 +166,12 @@ io.sockets.on('connection', function (socket) {
     });
 
     socket.on('changeName', function (name) {
-        socket.name = outputText(name);
-        names[socket.id] = outputText(name);
+        outputName = outputText(name.stripTags());
+        socket.name = outputName;
+        names[socket.id] = outputName;
+        for (id in sockets)
+            sockets[id].emit("localChange", {code: "name", author_id: socket.id, name: outputName})
+
     })
 
 
@@ -257,7 +289,11 @@ io.sockets.on('connection', function (socket) {
 
     socket.on('editNameChannel', function (channel) {
         console.log("[" + socket.id + "] change name of channel of id '" + channel.id + "' from '" + channels[channel.id].name + "'' to '" + channel.name + "'");
-        channels[channel.id].name = outputText(channel.name);
+        outputName = outputText(channel.name.stripTags());
+        channels[channel.id].name = outputName;
+
+        for (id in sockets)
+            sockets[id].emit("localChange", {code: "channel", channel_id: channel.id, name: outputName});
 
         saveRoomsToJson(); 
     });
@@ -265,7 +301,7 @@ io.sockets.on('connection', function (socket) {
     socket.on('addChannel', function(channel) {
         console.log("[" + socket.id + "] add a channel '" + channel.name + "' in channel '" + channels[channel.father].name + "'");
         newChannelId = channels.max(function(n) { return n.id }).id+1;
-        channels.add({"id":newChannelId,"name":outputText(channel.name),"sockets":[],"father":channel.father});
+        channels.add({"id":newChannelId,"name":outputText(channel.name.stripTags()),"sockets":[],"father":channel.father});
 
         saveRoomsToJson();
     });

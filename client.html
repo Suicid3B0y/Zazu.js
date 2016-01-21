@@ -48,6 +48,22 @@
 
         /** Utilities functions **/
 
+        function signin() {
+            console.log('signin');
+            var name = $('#si-nameInput').val();
+            if (name !== "") {
+                NAME = name;
+                $('#signForms').remove();
+                init();
+            } else
+                $('#sign-in-form .form-group').slice(0,1).toggleClass('has-error');
+        }
+
+        function signup() {
+            console.log('signup');
+            $('#sign-up-form .form-group').slice(0,3).toggleClass('has-error');
+        }
+
         function isJSON(val) {
             if (typeof(val) == 'string')
                 return false;
@@ -165,10 +181,10 @@
 
             for (var i = 0; i < menu.length; i++) {
                 if (isJSON(menu[i])) {
-                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-bottom'></span> " + menu[i].name + "</div><ul id='channelmenu_" + menu[i].id + "'>"
+                    add = "<li><div data-id-channel='" + menu[i].id + "'><span class='glyphicon glyphicon-triangle-bottom'></span> <span data-bind-id='" + menu[i].id  + "'>" + menu[i].name + "</span></div><ul id='channelmenu_" + menu[i].id + "'>"
                     for (var j = 0; j < menu[i].sockets.length; j++) {
                         var glyph = (MUTED.includes(menu[i].sockets[j])) ? "glyphicon-volume-off" : "glyphicon-volume-up";
-                        add += "<li data-id-user='" + menu[i].sockets[j] + "'><span class='glyphicon "+glyph+"'></span> " + NAMES[menu[i].sockets[j]] + "</li>";
+                        add += "<li data-id-user='" + menu[i].sockets[j] + "'><span class='glyphicon "+glyph+"'></span> <span data-bind-id='" + menu[i].sockets[j] + "'>" + NAMES[menu[i].sockets[j]] + "</span></li>";
                     }
                     add += "</ul></li>";
                     if (menu[i].father !== null)
@@ -496,6 +512,7 @@
 
                 signaling_socket.on('msgReceived', function (msg) {
                     console.log(msg);
+                    signaling_socket.emit('getListChannelsAndNames');
                     var chatContentElement = $('#chatContent');
                     switch (msg.code) {
                         case "disconnect":
@@ -564,11 +581,26 @@
                     }
                 })
 
-                function getListChannelsAndNames() {
-                    signaling_socket.emit('getListChannelsAndNames');
-                }
+                signaling_socket.on('localChange', function(change) {
+                    console.log(change);
+                    switch(change.code) {
+                        case "name":
+                            NAMES[change.author_id] = change.name;
+                            $("span[data-bind-id='" + change.author_id + "'").html(change.name);
+                            break;
+                        case "channel":
+                            CHANNELS[change.channel_id] = change.name;
+                            $("span[data-bind-id='" + change.channel_id + "'").html(change.name);
+                            break;
+                        default:
+                            console.log('wtf?');
+                            break;
+                    }
+                });
 
-                getListChannelsAndNamesInterval = setInterval(getListChannelsAndNames, 200)
+                signaling_socket.emit('getListChannelsAndNames');
+
+                //getListChannelsAndNamesInterval = setInterval(getListChannelsAndNames, 200)
 
                 /** WebRTC functions **/
 
@@ -743,10 +775,70 @@
     </script>
 
 </head>
-<body onload='ask_username()'>
+<body>
 <div class="container">
     <h1 style="text-align: center">Welcome to Zazu !</h1>
     <hr>
+    <div id="signForms" class="row">
+        <div class="col-md-6">
+            <h3>Sign in</h3>
+            <form class="form-horizontal" id="sign-in-form" onsubmit="signin(); return false;">
+                <div class="form-group">
+                    <label class="col-md-3 control-label" for="si-nameInput">Login</label>
+                    <div class="col-md-7">
+                        <input id="si-nameInput" type="text" placeholder="Login" autocomplete="off" class="form-control input-md">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 control-label" for="si-passwordInput">Password</label>
+                    <div class="col-md-7">
+                        <input id="si-passwordInput" type="password" placeholder="Password" autocomplete="off" class="form-control input-md">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 col-md-offset-3"><input type="checkbox"> Remember me</label>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-offset-3 col-md-7">
+                        <button type="button" class="btn btn-default">Reset</button>
+                        <button type="submit" class="btn btn-primary">Sign in</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="col-md-6">
+            <h3>Sign up</h3>
+            <form class="form-horizontal" id="sign-up-form" onsubmit="signup(); return false;">
+                <div class="form-group">
+                    <label class="col-md-3 control-label" for="su-nameInput">Login</label>
+                    <div class="col-md-7">
+                        <input id="su-nameInput" type="text" placeholder="Login" autocomplete="off" class="form-control input-md">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 control-label" for="su-passwordInput">Password</label>
+                    <div class="col-md-7">
+                        <input id="su-passwordInput" type="password" placeholder="Password" autocomplete="off" class="form-control input-md">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 control-label" for="su-repeatPasswordInput">Repeat password</label>
+                    <div class="col-md-7">
+                        <input id="su-repeatPasswordInput" type="password" placeholder="Repeat password" autocomplete="off" class="form-control input-md">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 col-md-offset-3"><input type="checkbox">Remember me</label>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-offset-3 col-md-7">
+                        <button type="button" class="btn btn-default">Reset</button>
+                        <button type="submit" class="btn btn-primary">Sign up</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
     <div class="row">
         <div class="col-md-6">
             <div id="listChannelsDiv">
