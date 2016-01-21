@@ -14,6 +14,18 @@
     margin-left: -14px;
 }
 
+#listChannels div[data-id-channel]:hover {
+	background: rgba(0,0,0,0.1);
+}
+
+#listChannels div[data-id-user]:hover {
+	background: rgba(13,135,233,0.1);
+}
+
+.fa.pull-right {
+	margin: 5px;
+}
+
 .ui-button {
     margin-top: 5px;
     margin-right: 5px;

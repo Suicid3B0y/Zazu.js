@@ -83,11 +83,17 @@ main.get('/js/:source', function (req, res) {
 main.get('/index.html', function (req, res) {
     res.sendFile('client.html', options);
 });
-main.get('/client.html', function (req, res) {
+main.get('/:.html', function (req, res) {
     res.sendFile('client.html', options);
 });
 main.get('/logo.html', function (req, res) {
     res.sendFile('logo.html', options);
+});
+main.get('/signForms.html', function (req, res) {
+    res.sendFile('signForms.html', options);
+});
+main.get('/zazuPanel.html', function (req, res) {
+    res.sendFile('zazuPanel.html', options);
 });
 
 var channels = listChannels;
@@ -103,10 +109,21 @@ io.sockets.on('connection', function (socket) {
 
     names[socket.id] = outputText(socket.name.stripTags());
 
-    for (id in sockets) {
-        sockets[id].emit('listNames', names);
-        sockets[id].emit("msgReceived", {code: "connect", author_id: socket.id, date: getTimestamp()})
-    }
+    // for (id in sockets) {
+    //     sockets[id].emit('listNames', names);
+    //     sockets[id].emit("msgReceived", {code: "connect", author_id: socket.id, date: getTimestamp()})
+    // }
+
+    socket.on('hasConnected', function (name) {
+        socket.name = outputText(name.stripTags());
+        names[socket.id] = socket.name;
+        for (id in sockets) {
+            sockets[id].emit('listNames', names);
+            sockets[id].emit("msgReceived", {code: "connect", author_id: socket.id, date: getTimestamp()});
+        }
+        if (socket.channel == null) 
+            join(DEFAULT_CHANNEL);
+    });
 
     function printChannels(channels) {
         var res = "";
@@ -190,7 +207,6 @@ io.sockets.on('connection', function (socket) {
             }
 
             for (id in channels[channel].sockets) {
-                console.log(channels[channel].sockets[id]);
                 sockets[channels[channel].sockets[id]].emit('addPeer', {
                     'peer_id': socket.id,
                     'should_create_offer': false
@@ -204,6 +220,9 @@ io.sockets.on('connection', function (socket) {
             }
 
             channels[channel].sockets.add(socket.id);
+
+            for (id in sockets)
+                sockets[id].emit('listChannels', channels);
         } else {
             console.log("[" + socket.id + "] ERROR: channel '" + channel + "' doesn't exist");
         }
@@ -212,22 +231,29 @@ io.sockets.on('connection', function (socket) {
     socket.on('join', join);
 
     function part(channel) {
-        console.log("[" + socket.id + "] part '" + channel + "'");
-        if (!(channel === socket.channel)) {
+        console.log("[" + socket.id + "] try to part '" + channel + "'");
+        if (channels[channel]) {
+            console.log("[" + socket.id + "] part '" + channel + "'");
+            if (!(channel === socket.channel)) {
 
-            console.log("[" + socket.id + "] ERROR: not in ", channel);
-            console.log("only in " + socket.channel);
-            return;
-        }
-        delete socket.channel;
-        channels[channel].sockets.remove(socket.id);
-        for (id in channels[channel].sockets) {
-            sockets[channels[channel].sockets[id]].emit('removePeer', {'peer_id': socket.id});
-            sockets[channels[channel].sockets[id]].emit('msgReceived', {
-                code: "moveChannelOut",
-                author_id: socket.id,
-                date: getTimestamp()
-            });
+                console.log("[" + socket.id + "] ERROR: not in ", channel);
+                console.log("only in " + socket.channel);
+                return;
+            }
+            delete socket.channel;
+            channels[channel].sockets.remove(socket.id);
+            for (id in channels[channel].sockets) {
+                sockets[channels[channel].sockets[id]].emit('removePeer', {'peer_id': socket.id});
+                sockets[channels[channel].sockets[id]].emit('msgReceived', {
+                    code: "moveChannelOut",
+                    author_id: socket.id,
+                    date: getTimestamp()
+                });
+            }
+            for (id in sockets)
+                sockets[id].emit('listChannels', channels);
+        } else {
+            console.log("[" + socket.id + "] ERROR: channel '" + channel +"' doesn't exist");
         }
     }
 
@@ -287,13 +313,25 @@ io.sockets.on('connection', function (socket) {
         }
     });
 
-    socket.on('editNameChannel', function (channel) {
-        console.log("[" + socket.id + "] change name of channel of id '" + channel.id + "' from '" + channels[channel.id].name + "'' to '" + channel.name + "'");
-        outputName = outputText(channel.name.stripTags());
-        channels[channel.id].name = outputName;
+    socket.on('editChannel', function (edit) {
+        console.log("[" + socket.id + "] change channel of id '" + edit.id + "'");
+        outputName = outputText(edit.channel.name.stripTags());
+        outputDescription = outputText(edit.channel.description.stripTags());
+        var nameChanged = (channels[edit.id].name !== outputName);
+        var descChanged = (channels[edit.id].description !== outputDescription);
 
-        for (id in sockets)
-            sockets[id].emit("localChange", {code: "channel", channel_id: channel.id, name: outputName});
+        if (descChanged) {
+            channels[edit.id].name = outputName;
+            channels[edit.id].description = outputDescription;
+
+            for (id in sockets)
+                sockets[id].emit('listChannels', channels);
+        } else if (nameChanged) {
+            channels[edit.id].name = outputName;
+            
+            for (id in sockets)
+                sockets[id].emit("localChange", {code: "channel", channel_id: edit.id, name: outputName});
+        }
 
         saveRoomsToJson(); 
     });
@@ -303,6 +341,8 @@ io.sockets.on('connection', function (socket) {
         newChannelId = channels.max(function(n) { return n.id }).id+1;
         channels.add({"id":newChannelId,"name":outputText(channel.name.stripTags()),"sockets":[],"father":channel.father});
 
+        for (id in sockets)
+            sockets[id].emit('listChannels', channels);
         saveRoomsToJson();
     });
 
@@ -311,7 +351,6 @@ io.sockets.on('connection', function (socket) {
         socket.emit('listChannels', channels);
     });
 
-    join(DEFAULT_CHANNEL);
     //listChannelsInterval = setInterval(sendListChannels, 1000);
 
     socket.on('muted', function () {
@@ -341,7 +380,7 @@ io.sockets.on('connection', function (socket) {
     socket.on('relayICECandidate', function (config) {
         var peer_id = config.peer_id;
         var ice_candidate = config.ice_candidate;
-        console.log("[" + socket.id + "] relaying ICE candidate to [" + peer_id + "] ", ice_candidate);
+        ///console.log("[" + socket.id + "] relaying ICE candidate to [" + peer_id + "] ", ice_candidate);
 
         if (peer_id in sockets) {
             sockets[peer_id].emit('iceCandidate', {'peer_id': socket.id, 'ice_candidate': ice_candidate});
@@ -351,7 +390,7 @@ io.sockets.on('connection', function (socket) {
     socket.on('relaySessionDescription', function (config) {
         var peer_id = config.peer_id;
         var session_description = config.session_description;
-        console.log("[" + socket.id + "] relaying session description to [" + peer_id + "] ", session_description);
+        //console.log("[" + socket.id + "] relaying session description to [" + peer_id + "] ", session_description);
 
         if (peer_id in sockets) {
             sockets[peer_id].emit('sessionDescription', {
