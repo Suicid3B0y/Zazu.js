@@ -11,8 +11,9 @@
   "author": "Thomas Viau <viau.thomas@gmail.com>",
   "license": "All rights reserved",
   "dependencies": {
-    "express": "^4.12.4",
-    "sugar": "^1.4.1",
-    "socket.io": ""
+    "express": "~4.13.3",
+    "sugar": "~1.4.1",
+    "socket.io": "~1.4.4",
+    "sqlite3": "~3.1.1"
   }
 }
