@@ -1,4 +1,7 @@
 var PORT = 8080;
+if (process.argv[2]) {
+    PORT = process.argv[2];
+}
 
 var express = require('express');
 var http = require('http');
@@ -17,31 +20,31 @@ function fileExists(filePath) {
 }
 
 var listChannels = null;
-if (fileExists('./serverRooms.json')) {
-    listChannels = require('./serverRooms.json');
+if (fileExists(__dirname + '/serverRooms.json')) {
+    listChannels = require(__dirname + '/serverRooms.json');
 } else {
-    listChannels = require('./defaultRooms.json');
+    listChannels = require(__dirname + '/defaultRooms.json');
 }
 
 /** Database conf **/
 
-var dbFile = "zazu.db";
+var dbFile = __dirname + "/zazu.db";
 var dbExists = fileExists(dbFile);
 
-if(!dbExists) {
-  console.log("Creating DB SQLite file.");
-  fs.openSync(dbFile, "w");
+if (!dbExists) {
+    console.log("Creating DB SQLite file.");
+    fs.openSync(dbFile, "w");
 }
 
 var sqlite3 = require("sqlite3").verbose();
 var db = new sqlite3.Database(dbFile);
 
 db.serialize(function() {
-    db.run("CREATE TABLE IF NOT EXISTS `users`("+
-        "`id` VARCHAR(40) NOT NULL PRIMARY KEY,"+
-        "`username` VARCHAR(40) NOT NULL,"+
-        "`password` VARCHAR(40) NOT NULL"+
-    ")");
+    db.run("CREATE TABLE IF NOT EXISTS `users`(" +
+        "`id` VARCHAR(40) NOT NULL PRIMARY KEY," +
+        "`username` VARCHAR(40) NOT NULL," +
+        "`password` VARCHAR(40) NOT NULL" +
+        ")");
 
 
 });
@@ -52,7 +55,7 @@ db.close();
 
 console.log(listChannels);
 var DEFAULT_CHANNEL = listChannels[0].id;
-server.listen(PORT, null, function () {
+server.listen(PORT, null, function() {
     console.log("Listening on port " + PORT);
 });
 
@@ -65,42 +68,27 @@ var options = {
     }
 };
 
-main.get('/', function (req, res) {
-    res.sendFile('client.html', options);
+main.get('/', function(req, res) {
+    res.sendFile('views/client.html', options);
 });
-main.get('/:source', function (req, res) {
-    res.sendFile(req.params.source, options);
-});
-main.get('/css/:source', function (req, res) {
+main.get('/css/:source', function(req, res) {
     res.sendFile("css/" + req.params.source, options);
 });
-main.get('/fonts/:source', function (req, res) {
+main.get('/fonts/:source', function(req, res) {
     res.sendFile("fonts/" + req.params.source, options);
 });
-main.get('/js/:source', function (req, res) {
+main.get('/js/:source', function(req, res) {
     res.sendFile("js/" + req.params.source, options);
 });
-main.get('/index.html', function (req, res) {
-    res.sendFile('client.html', options);
-});
-main.get('/:.html', function (req, res) {
-    res.sendFile('client.html', options);
-});
-main.get('/logo.html', function (req, res) {
-    res.sendFile('logo.html', options);
-});
-main.get('/signForms.html', function (req, res) {
-    res.sendFile('signForms.html', options);
-});
-main.get('/zazuPanel.html', function (req, res) {
-    res.sendFile('zazuPanel.html', options);
+main.get('/views/:source', function(req, res) {
+    res.sendFile("views/" + req.params.source, options);
 });
 
 var channels = listChannels;
 var sockets = {};
 var names = {};
 
-io.sockets.on('connection', function (socket) {
+io.sockets.on('connection', function(socket) {
     socket.channel = null;
     socket.name = (socket.handshake.query.name !== null && socket.handshake.query.name !== "") ? socket.handshake.query.name : "Noob user";
     socket.microphone_ok = socket.handshake.query.microphone_ok;
@@ -114,14 +102,18 @@ io.sockets.on('connection', function (socket) {
     //     sockets[id].emit("msgReceived", {code: "connect", author_id: socket.id, date: getTimestamp()})
     // }
 
-    socket.on('hasConnected', function (name) {
+    socket.on('hasConnected', function(name) {
         socket.name = outputText(name.stripTags());
         names[socket.id] = socket.name;
         for (id in sockets) {
             sockets[id].emit('listNames', names);
-            sockets[id].emit("msgReceived", {code: "connect", author_id: socket.id, date: getTimestamp()});
+            sockets[id].emit("msgReceived", {
+                code: "connect",
+                author_id: socket.id,
+                date: getTimestamp()
+            });
         }
-        if (socket.channel == null) 
+        if (socket.channel == null)
             join(DEFAULT_CHANNEL);
     });
 
@@ -133,8 +125,8 @@ io.sockets.on('connection', function (socket) {
                 var tmp = Object.extended(channels[i]).clone(); // Obligé pour ne pas modifier le channel.sockets original
                 tmp = Object.select(tmp, ['id', 'name', 'description', 'father']);
                 tmp.sockets = [];
-                if (i != channels.length-1) res += JSON.stringify(tmp)+",\n";
-                else res += JSON.stringify(tmp)+"\n";
+                if (i != channels.length - 1) res += JSON.stringify(tmp) + ",\n";
+                else res += JSON.stringify(tmp) + "\n";
             }
             res += "]";
             return res;
@@ -147,47 +139,52 @@ io.sockets.on('connection', function (socket) {
     }
 
     function saveRoomsToJson() {
-        var outputJson = "serverRooms.json";
+        var outputJson = __dirname + "/serverRooms.json";
         fs.writeFile(outputJson, printChannels(channels), function(err) {
-            if(err) {
-              console.log(err);
+            if (err) {
+                console.log(err);
             } else {
-              console.log("JSON saved to " + outputJson);
+                console.log("JSON saved to " + outputJson);
             }
         });
     }
 
     function replaceURL(text) {
         var exp = /(\b(https?):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
-        return text.replace(exp,"<a href='$1'>$1</a>"); 
+        return text.replace(exp, "<a href='$1'>$1</a>");
     }
 
     function outputText(text) {
-        return replaceURL(text.replace(/</g, '&lt;').
-        replace(/>/g, '&gt;').
-        replace(/"/g, '&quot;').
-        replace(/'/g, '&#039;'));
+        return replaceURL(text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'));
     }
 
     function getTimestamp() {
         return parseInt(Date.now() / 1000, 10);
     }
 
-    socket.on('disconnect', function () {
+    socket.on('disconnect', function() {
         part(socket.channel);
         console.log("[" + socket.id + "] disconnected");
         for (id in sockets)
-            sockets[id].emit("msgReceived", {code: "disconnect", author_id: socket.id, date: getTimestamp()})
+            sockets[id].emit("msgReceived", {
+                code: "disconnect",
+                author_id: socket.id,
+                date: getTimestamp()
+            })
         delete sockets[socket.id];
         delete names[socket.id];
     });
 
-    socket.on('changeName', function (name) {
+    socket.on('changeName', function(name) {
         outputName = outputText(name.stripTags());
         socket.name = outputName;
         names[socket.id] = outputName;
         for (id in sockets)
-            sockets[id].emit("localChange", {code: "name", author_id: socket.id, name: outputName})
+            sockets[id].emit("localChange", {
+                code: "name",
+                author_id: socket.id,
+                name: outputName
+            })
 
     })
 
@@ -203,7 +200,11 @@ io.sockets.on('connection', function (socket) {
                 socket.channel = channel;
                 console.log("[" + socket.id + "] joined '" + channel + "'");
                 socket.emit('joinSuccess', channel);
-                socket.emit('msgReceived', {code: "moveSelf", content: channels[channel].name, date: getTimestamp()});
+                socket.emit('msgReceived', {
+                    code: "moveSelf",
+                    content: channels[channel].name,
+                    date: getTimestamp()
+                });
             }
 
             for (id in channels[channel].sockets) {
@@ -211,7 +212,10 @@ io.sockets.on('connection', function (socket) {
                     'peer_id': socket.id,
                     'should_create_offer': false
                 });
-                socket.emit('addPeer', {'peer_id': channels[channel].sockets[id], 'should_create_offer': true});
+                socket.emit('addPeer', {
+                    'peer_id': channels[channel].sockets[id],
+                    'should_create_offer': true
+                });
                 sockets[channels[channel].sockets[id]].emit('msgReceived', {
                     code: "moveChannelIn",
                     author_id: socket.id,
@@ -243,7 +247,9 @@ io.sockets.on('connection', function (socket) {
             delete socket.channel;
             channels[channel].sockets.remove(socket.id);
             for (id in channels[channel].sockets) {
-                sockets[channels[channel].sockets[id]].emit('removePeer', {'peer_id': socket.id});
+                sockets[channels[channel].sockets[id]].emit('removePeer', {
+                    'peer_id': socket.id
+                });
                 sockets[channels[channel].sockets[id]].emit('msgReceived', {
                     code: "moveChannelOut",
                     author_id: socket.id,
@@ -253,13 +259,13 @@ io.sockets.on('connection', function (socket) {
             for (id in sockets)
                 sockets[id].emit('listChannels', channels);
         } else {
-            console.log("[" + socket.id + "] ERROR: channel '" + channel +"' doesn't exist");
+            console.log("[" + socket.id + "] ERROR: channel '" + channel + "' doesn't exist");
         }
     }
 
     socket.on('part', part);
 
-    socket.on('msgSent', function (msg) {
+    socket.on('msgSent', function(msg) {
         switch (msg.code) {
             case "channel":
                 console.log("[" + socket.id + "] send '" + encodeURI(msg.content) + "' to '" + socket.channel + "'");
@@ -282,7 +288,7 @@ io.sockets.on('connection', function (socket) {
                         'date': getTimestamp()
                     });
                 }
-                if (channels[msg.id].sockets.indexOf(socket.id) == -1) {
+                if (channels[msg.id].sockets.indexOf(socket.id) == -1)  {
                     socket.emit('msgReceived', {
                         'code': 'channelOut',
                         'content': outputText(msg.content),
@@ -313,7 +319,7 @@ io.sockets.on('connection', function (socket) {
         }
     });
 
-    socket.on('editChannel', function (edit) {
+    socket.on('editChannel', function(edit) {
         console.log("[" + socket.id + "] change channel of id '" + edit.id + "'");
         outputName = outputText(edit.channel.name.stripTags());
         outputDescription = outputText(edit.channel.description.stripTags());
@@ -328,66 +334,88 @@ io.sockets.on('connection', function (socket) {
                 sockets[id].emit('listChannels', channels);
         } else if (nameChanged) {
             channels[edit.id].name = outputName;
-            
+
             for (id in sockets)
-                sockets[id].emit("localChange", {code: "channel", channel_id: edit.id, name: outputName});
+                sockets[id].emit("localChange", {
+                    code: "channel",
+                    channel_id: edit.id,
+                    name: outputName
+                });
         }
 
-        saveRoomsToJson(); 
+        saveRoomsToJson();
     });
 
     socket.on('addChannel', function(channel) {
         console.log("[" + socket.id + "] add a channel '" + channel.name + "' in channel '" + channels[channel.father].name + "'");
-        newChannelId = channels.max(function(n) { return n.id }).id+1;
-        channels.add({"id":newChannelId,"name":outputText(channel.name.stripTags()),"sockets":[],"father":channel.father});
+        newChannelId = channels.max(function(n) {
+            return n.id
+        }).id + 1;
+        channels.add({
+            "id": newChannelId,
+            "name": outputText(channel.name.stripTags()),
+            "sockets": [],
+            "father": channel.father
+        });
 
         for (id in sockets)
             sockets[id].emit('listChannels', channels);
         saveRoomsToJson();
     });
 
-    socket.on('getListChannelsAndNames', function () {
+    socket.on('getListChannelsAndNames', function() {
         socket.emit('listNames', names);
         socket.emit('listChannels', channels);
     });
 
     //listChannelsInterval = setInterval(sendListChannels, 1000);
 
-    socket.on('muted', function () {
+    socket.on('muted', function() {
         for (peer in sockets) {
-            sockets[peer].emit('muted', {'peer_id': socket.id});
+            sockets[peer].emit('muted', {
+                'peer_id': socket.id
+            });
         }
     })
 
-    socket.on('unmuted', function () {
+    socket.on('unmuted', function() {
         for (peer in sockets) {
-            sockets[peer].emit('unmuted', {'peer_id': socket.id});
+            sockets[peer].emit('unmuted', {
+                'peer_id': socket.id
+            });
         }
     })
 
     socket.on('deafen', function() {
         for (peer in sockets) {
-            sockets[peer].emit('deafen', {'peer_id': socket.id});
+            sockets[peer].emit('deafen', {
+                'peer_id': socket.id
+            });
         }
     })
 
     socket.on('undeafen', function() {
         for (peer in sockets) {
-            sockets[peer].emit('undeafen', {'peer_id': socket.id});
+            sockets[peer].emit('undeafen', {
+                'peer_id': socket.id
+            });
         }
     })
 
-    socket.on('relayICECandidate', function (config) {
+    socket.on('relayICECandidate', function(config) {
         var peer_id = config.peer_id;
         var ice_candidate = config.ice_candidate;
         ///console.log("[" + socket.id + "] relaying ICE candidate to [" + peer_id + "] ", ice_candidate);
 
         if (peer_id in sockets) {
-            sockets[peer_id].emit('iceCandidate', {'peer_id': socket.id, 'ice_candidate': ice_candidate});
+            sockets[peer_id].emit('iceCandidate', {
+                'peer_id': socket.id,
+                'ice_candidate': ice_candidate
+            });
         }
     });
 
-    socket.on('relaySessionDescription', function (config) {
+    socket.on('relaySessionDescription', function(config) {
         var peer_id = config.peer_id;
         var session_description = config.session_description;
         //console.log("[" + socket.id + "] relaying session description to [" + peer_id + "] ", session_description);
