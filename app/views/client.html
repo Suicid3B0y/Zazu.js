@@ -7,16 +7,13 @@
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
             integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
             crossorigin="anonymous"></script>
-    <script src="js/bootstrap-contextmenu.js"></script>
-    <script src="js/bootbox.min.js"></script>
-    <script src="js/adapter.js"></script>
-    <link rel="stylesheet" type="text/css" href="css/bootstrap.css"/>
+    <script src="/js/zazu.min.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="/css/zazu.min.css"/>
+    <link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-    <link rel="stylesheet" type="text/css" href="css/client.css"/>
-    <link rel="stylesheet" type="text/css" href="css/awesome-bootstrap-checkbox.css"/>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/utilities.js"></script>
     <script>
     (function($) {
 
@@ -48,14 +45,14 @@
 
         /** Utilities functions **/
 
-        $.get("signForms.html", function(signForms) {
+        $.get("views/signForms.html", function(signForms) {
             $('.container').append(signForms);
             $('#sign-in-form').on('submit', signin);
             $('#sign-up-form').on('submit', signup);
-        }); 
+        });
 
         function zazuPanel() {
-            $.get("zazuPanel.html", function(panel) {
+            $.get("views/zazuPanel.html", function(panel) {
                 $('.container').append(panel);
                 $('#autoscroll-chat-container').on('click', toggle_autoscroll);
                 add_chat_listener();
@@ -187,10 +184,10 @@
                 $(channel).removeClass('glyphicon-triangle-right').addClass('glyphicon-triangle-bottom');
                 $(channel.parentNode.nextSibling).css({height:'auto', overflow:'hidden'});
             } else if ($(channel).hasClass('glyphicon-triangle-bottom')) {
-                $(channel).removeClass('glyphicon-triangle-bottom').addClass('glyphicon-triangle-right'); 
+                $(channel).removeClass('glyphicon-triangle-bottom').addClass('glyphicon-triangle-right');
                 $(channel.parentNode.nextSibling).css({height:'0px', overflow:'auto'});
             } else {
-                console.log('ERROR: incorrect call to collapsing with : ', channel); 
+                console.log('ERROR: incorrect call to collapsing with : ', channel);
             }
         }
 
@@ -202,7 +199,7 @@
             if ($(channel).hasClass('fa-bookmark')) {
                 CHANNELS[$(channel.parentNode).data().idChannel].toRead = false;
                 $(channel).removeClass('fa-bookmark').addClass('fa-bookmark-o');
-            }            
+            }
         }
 
         function showComment(user) {
@@ -212,7 +209,7 @@
             });
             if ($(user).hasClass('fa-star')) {
                 $(user).removeClass('fa-star').addClass('fa-star-o');
-            }       
+            }
         }
 
         function create_menu(menu) {
@@ -221,7 +218,7 @@
 
             for (var i = 0; i < menu.length; i++) {
                 if (isJSON(menu[i])) {
-                    add = 
+                    add =
                         "<li>"+
                         "<div data-id-channel='" + menu[i].id + "'>"+
                             "<span class='glyphicon glyphicon-triangle-bottom'></span> "+
@@ -323,7 +320,7 @@
                         target: '#contextMenu',
                         before: function (e, context) {
                             rightClick = context;
-                            $('#contextMenu > ul').get(0).innerHTML = 
+                            $('#contextMenu > ul').get(0).innerHTML =
                                 '<li><a tabindex="-1">Join channel</a></li>'+
                                 '<li><a tabindex="-1">Message to channel</a></li>'+
                                 '<li><a tabindex="-1">Edit channel</a></li>'+
@@ -350,7 +347,7 @@
                                 case "Edit channel":
                                     bootbox.dialog({
                                             title: "Edit channel",
-                                            message: 
+                                            message:
                                                 '<div class="row">  ' +
                                                     '<div class="col-md-12"> ' +
                                                         '<form class="form-horizontal" id="editChannel" onsubmit="return false;"> ' +
@@ -363,7 +360,7 @@
                                                             '<div class="form-group"> ' +
                                                                 '<label class="col-md-2 control-label" for="descriptionTextarea">Description</label> ' +
                                                                 '<div class="col-md-10"> ' +
-                                                                    '<textarea name="descriptionTextarea" class="cool-md-10 form-control" rows="3">' + CHANNELS[channel].description + '</textarea> ' +
+                                                                    '<textarea name="descriptionTextarea" class="cool-md-10 form-control" rows="3">' + ((CHANNELS[channel].description) ? CHANNELS[channel].description : "") + '</textarea> ' +
                                                                 '</div> ' +
                                                             '</div> ' +
                                                         '</form> ' +
@@ -384,7 +381,7 @@
                                                         channelData.description = form.find("textarea[name='descriptionTextarea']").val();
                                                         if (channelData.name !== "") {
                                                             signaling_socket.emit('editChannel', {
-                                                                id: channel, 
+                                                                id: channel,
                                                                 channel: channelData
                                                             });
                                                         }
@@ -398,7 +395,7 @@
                                     bootbox.prompt("Enter a name for the new channel", function (name) {
                                         if (name !== null) {
                                             signaling_socket.emit('addChannel', {
-                                                name: name, 
+                                                name: name,
                                                 father: channel
                                             });
                                         }
