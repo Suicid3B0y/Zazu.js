@@ -16,7 +16,9 @@
     "socket.io": "~1.4.4",
     "sqlite3": "~3.1.1",
     "grunt": "~0.4.5",
-    "coffee-script": "~1.10.0"
+    "coffee-script": "~1.10.0",
+    "body-parser": "~1.14.2",
+    "node-uuid": "~1.4.7"
   },
   "devDependencies": {
     "grunt": "~0.4.5",
