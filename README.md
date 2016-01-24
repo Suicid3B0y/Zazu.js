@@ -17,7 +17,7 @@ make
 You can use *make http* or *make https*
 
 #### Access in browser
-Browse to *http://localhost/* or *http://<ip/url_of_your_server>/* to use Zazu.
+Browse to `http://localhost/` or `http://<ip/url_of_your_server>/` to use Zazu.
 
 ## How to contribute 
 * fork the branch 'dev' 
