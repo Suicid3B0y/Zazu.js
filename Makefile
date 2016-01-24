@@ -1,11 +1,14 @@
 NAME=zazu
-VERSION=0.0.6
-HTTP_PORT=8080
+HTTP_PORT=80
 HTTPS_PORT=443
 
-all: prepare build launchHTTP
+all: http
 
-https: prepare build launchHTTPS
+http: prepare build
+	node app/zazu-server ${HTTP_PORT}
+
+https: prepare build
+	node app/zazu-server ${HTTPS_PORT}
 
 prepare:
 	mkdir -p app
@@ -15,9 +18,4 @@ prepare:
 
 build:
 	grunt
-
-launchHTTP:
-	node app/zazu-server ${HTTP_PORT}
-
-launchHTTPS:
-	node app/zazu-server ${HTTP_PORTS}
+	
